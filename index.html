@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Disease Probability Visualizer</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Disease Probability Visualizer</h1>
+            <p class="subtitle">Visualize post-test probability based on diagnostic test parameters</p>
+        </header>
+
+        <div class="main-content">
+            <aside class="sidebar">
+                <div class="control-section">
+                    <h3>Select X-axis Variable</h3>
+                    <select id="x-variable" class="control-input">
+                        <option value="prevalence">Prevalence</option>
+                        <option value="sensitivity">Sensitivity</option>
+                        <option value="specificity">Specificity</option>
+                        <option value="lr_pos">Likelihood Ratio +</option>
+                        <option value="lr_neg">Likelihood Ratio -</option>
+                    </select>
+                </div>
+
+                <hr>
+
+                <div class="control-section">
+                    <h3>Fixed Parameters</h3>
+
+                    <div id="prevalence-control" class="parameter-control">
+                        <label for="prevalence">
+                            Prevalence: <span id="prevalence-value">0.10</span>
+                        </label>
+                        <input type="range" id="prevalence" min="0.01" max="0.99" step="0.01" value="0.10" class="slider">
+                    </div>
+
+                    <div id="sensitivity-control" class="parameter-control">
+                        <label for="sensitivity">
+                            Sensitivity: <span id="sensitivity-value">0.90</span>
+                        </label>
+                        <input type="range" id="sensitivity" min="0.01" max="0.99" step="0.01" value="0.90" class="slider">
+                    </div>
+
+                    <div id="specificity-control" class="parameter-control">
+                        <label for="specificity">
+                            Specificity: <span id="specificity-value">0.90</span>
+                        </label>
+                        <input type="range" id="specificity" min="0.01" max="0.99" step="0.01" value="0.90" class="slider">
+                    </div>
+
+                    <div id="lr-pos-control" class="parameter-control">
+                        <label for="lr-pos">
+                            Likelihood Ratio +: <span id="lr-pos-value">9.0</span>
+                        </label>
+                        <input type="number" id="lr-pos" min="0.1" max="100" step="0.1" value="9.0" class="number-input">
+                    </div>
+
+                    <div id="lr-neg-control" class="parameter-control">
+                        <label for="lr-neg">
+                            Likelihood Ratio -: <span id="lr-neg-value">0.11</span>
+                        </label>
+                        <input type="number" id="lr-neg" min="0.01" max="10" step="0.01" value="0.11" class="number-input">
+                    </div>
+                </div>
+
+                <hr>
+
+                <div class="control-section">
+                    <h3>Test Result</h3>
+                    <select id="test-result" class="control-input">
+                        <option value="positive">Positive</option>
+                        <option value="negative">Negative</option>
+                    </select>
+                </div>
+
+                <div class="help-text">
+                    <p><strong>Note:</strong> When using likelihood ratios, they will override sensitivity and specificity calculations.</p>
+                </div>
+            </aside>
+
+            <main class="chart-container">
+                <canvas id="probability-chart"></canvas>
+                <div class="interpretation">
+                    <h4>Interpretation</h4>
+                    <p id="interpretation-text"></p>
+                </div>
+            </main>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+    <script src="app.js"></script>
+</body>
+</html>
