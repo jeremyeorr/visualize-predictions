@@ -83,18 +83,28 @@ function generatePlotData() {
         xValues = Array.from({length: 100}, (_, i) => 0.01 + (i * 0.98 / 99));
         xLabel = 'Specificity';
     } else if (xVar === 'lr_pos') {
-        // Use logarithmic spacing for LR+
-        const minLog = Math.log10(0.1);
-        const maxLog = Math.log10(50);
+        // Vary LR+ by adjusting sensitivity, keeping specificity constant
+        // LR+ = sens / (1 - spec), where sens ranges from 0.01 to 0.99
+        // Min LR+ when sens = 0.01: 0.01 / (1 - spec)
+        // Max LR+ when sens = 0.99: 0.99 / (1 - spec)
+        const minLRPos = 0.01 / (1 - specificity);
+        const maxLRPos = 0.99 / (1 - specificity);
+        const minLog = Math.log10(Math.max(minLRPos, 0.01));
+        const maxLog = Math.log10(Math.min(maxLRPos, 1000));
         xValues = Array.from({length: 100}, (_, i) => {
             const logValue = minLog + (i * (maxLog - minLog) / 99);
             return Math.pow(10, logValue);
         });
         xLabel = 'Likelihood Ratio +';
     } else if (xVar === 'lr_neg') {
-        // Use logarithmic spacing for LR-
-        const minLog = Math.log10(0.01);
-        const maxLog = Math.log10(1);
+        // Vary LR- by adjusting specificity, keeping sensitivity constant
+        // LR- = (1 - sens) / spec, where spec ranges from 0.01 to 0.99
+        // Max LR- when spec = 0.01: (1 - sens) / 0.01
+        // Min LR- when spec = 0.99: (1 - sens) / 0.99
+        const minLRNeg = (1 - sensitivity) / 0.99;
+        const maxLRNeg = (1 - sensitivity) / 0.01;
+        const minLog = Math.log10(Math.max(minLRNeg, 0.001));
+        const maxLog = Math.log10(Math.min(maxLRNeg, 100));
         xValues = Array.from({length: 100}, (_, i) => {
             const logValue = minLog + (i * (maxLog - minLog) / 99);
             return Math.pow(10, logValue);
@@ -116,15 +126,31 @@ function generatePlotData() {
         } else if (xVar === 'specificity') {
             spec = x;
         } else if (xVar === 'lr_pos') {
-            // Keep LR- constant, vary LR+, recalculate sens/spec
-            const result = calculateSensSpec(x, lrNeg);
-            sens = result.sensitivity;
-            spec = result.specificity;
+            // Vary LR+ by adjusting sensitivity, keep specificity constant
+            // LR+ = sens / (1 - spec)
+            // Therefore: sens = LR+ * (1 - spec)
+            sens = x * (1 - specificity);
+            spec = specificity;
+
+            // Validate bounds
+            if (sens < 0 || sens > 1 || spec < 0 || spec > 1) {
+                positiveProbabilities.push(NaN);
+                negativeProbabilities.push(NaN);
+                return;
+            }
         } else if (xVar === 'lr_neg') {
-            // Keep LR+ constant, vary LR-, recalculate sens/spec
-            const result = calculateSensSpec(lrPos, x);
-            sens = result.sensitivity;
-            spec = result.specificity;
+            // Vary LR- by adjusting specificity, keep sensitivity constant
+            // LR- = (1 - sens) / spec
+            // Therefore: spec = (1 - sens) / LR-
+            spec = (1 - sensitivity) / x;
+            sens = sensitivity;
+
+            // Validate bounds
+            if (sens < 0 || sens > 1 || spec < 0 || spec > 1) {
+                positiveProbabilities.push(NaN);
+                negativeProbabilities.push(NaN);
+                return;
+            }
         }
 
         const prev = (xVar === 'prevalence') ? x : prevalence;
@@ -180,25 +206,27 @@ function updateChart() {
                 datasets: [
                     {
                         label: 'Positive Test Result',
-                        data: xValues.map((x, i) => ({x: x, y: positiveProbabilities[i]})),
+                        data: xValues.map((x, i) => ({x: x, y: positiveProbabilities[i]})).filter(p => !isNaN(p.y)),
                         borderColor: 'rgb(102, 126, 234)',
                         backgroundColor: 'rgba(102, 126, 234, 0.1)',
                         borderWidth: 3,
                         fill: true,
                         tension: 0.4,
                         pointRadius: 0,
-                        pointHoverRadius: 5
+                        pointHoverRadius: 5,
+                        spanGaps: false
                     },
                     {
                         label: 'Negative Test Result',
-                        data: xValues.map((x, i) => ({x: x, y: negativeProbabilities[i]})),
+                        data: xValues.map((x, i) => ({x: x, y: negativeProbabilities[i]})).filter(p => !isNaN(p.y)),
                         borderColor: 'rgb(220, 38, 127)',
                         backgroundColor: 'rgba(220, 38, 127, 0.1)',
                         borderWidth: 3,
                         fill: true,
                         tension: 0.4,
                         pointRadius: 0,
-                        pointHoverRadius: 5
+                        pointHoverRadius: 5,
+                        spanGaps: false
                     }
                 ]
             },
@@ -286,36 +314,123 @@ function updateChart() {
         };
 
         chart.data.labels = xValues;
-        chart.data.datasets[0].data = xValues.map((x, i) => ({x: x, y: positiveProbabilities[i]}));
-        chart.data.datasets[1].data = xValues.map((x, i) => ({x: x, y: negativeProbabilities[i]}));
+        // Filter out NaN values for invalid combinations
+        chart.data.datasets[0].data = xValues.map((x, i) => ({x: x, y: positiveProbabilities[i]})).filter(p => !isNaN(p.y));
+        chart.data.datasets[1].data = xValues.map((x, i) => ({x: x, y: negativeProbabilities[i]})).filter(p => !isNaN(p.y));
         chart.update('none');
     }
 
     updateInterpretation(positiveProbabilities, negativeProbabilities, xLabel);
 }
 
-// Update interpretation text
+// Update interpretation text with meaningful insights
 function updateInterpretation(positiveProbabilities, negativeProbabilities, xLabel) {
     const minPosProb = Math.min(...positiveProbabilities);
     const maxPosProb = Math.max(...positiveProbabilities);
     const minNegProb = Math.min(...negativeProbabilities);
     const maxNegProb = Math.max(...negativeProbabilities);
 
-    const varNames = {
-        'Prevalence': 'prevalence',
-        'Sensitivity': 'sensitivity',
-        'Specificity': 'specificity',
-        'Likelihood Ratio +': 'positive likelihood ratio',
-        'Likelihood Ratio -': 'negative likelihood ratio'
-    };
+    const xVar = xVariableSelect.value;
+    const currentPrevalence = parseFloat(prevalenceSlider.value);
 
-    interpretationText.textContent = `As ${varNames[xLabel]} varies across its range: With a positive test result, the post-test probability ranges from ${(minPosProb * 100).toFixed(1)}% to ${(maxPosProb * 100).toFixed(1)}%. With a negative test result, it ranges from ${(minNegProb * 100).toFixed(1)}% to ${(maxNegProb * 100).toFixed(1)}%.`;
+    let interpretation = '';
+
+    // Calculate key insights
+    const posRange = maxPosProb - minPosProb;
+    const negRange = maxNegProb - minNegProb;
+    const posImpact = posRange / currentPrevalence; // How much test changes from baseline
+    const negImpact = (currentPrevalence - minNegProb) / currentPrevalence;
+
+    // Main message based on x-axis variable
+    if (xVar === 'prevalence') {
+        const lowPrev = minPosProb < 0.5 && maxPosProb < 0.5;
+        const highPrev = minPosProb > 0.5 && maxPosProb > 0.5;
+
+        if (lowPrev) {
+            interpretation = `Even with a positive test, post-test probability peaks at ${(maxPosProb * 100).toFixed(0)}% when prevalence is highest. In low-prevalence settings, positive results may require confirmation. `;
+        } else if (highPrev) {
+            interpretation = `In high-prevalence settings, a positive test confirms disease with ${(maxPosProb * 100).toFixed(0)}% probability. `;
+        } else {
+            interpretation = `Post-test probability crosses the 50% threshold around ${(0.5 / maxPosProb * 0.99).toFixed(0)}% prevalence. `;
+        }
+
+        if (minNegProb < 0.05) {
+            interpretation += `A negative test effectively rules out disease (down to ${(minNegProb * 100).toFixed(1)}%).`;
+        } else if (minNegProb > 0.1) {
+            interpretation += `However, even with a negative test, ${(minNegProb * 100).toFixed(0)}% probability remains at low prevalence.`;
+        }
+
+    } else if (xVar === 'sensitivity') {
+        if (maxPosProb > 0.9) {
+            interpretation = `High sensitivity (>80%) makes positive tests highly informative, reaching ${(maxPosProb * 100).toFixed(0)}% probability. `;
+        } else {
+            interpretation = `With current specificity (${(parseFloat(specificitySlider.value) * 100).toFixed(0)}%), positive tests peak at ${(maxPosProb * 100).toFixed(0)}% probability. `;
+        }
+
+        if (maxNegProb > 0.2) {
+            interpretation += `Low sensitivity means negative tests cannot rule out disease (${(maxNegProb * 100).toFixed(0)}% remains at low sensitivity).`;
+        } else {
+            interpretation += `Higher sensitivity makes negative tests more reliable for ruling out disease.`;
+        }
+
+    } else if (xVar === 'specificity') {
+        if (minPosProb < 0.3) {
+            interpretation = `Low specificity leads to many false positives - even with a positive test, probability is only ${(minPosProb * 100).toFixed(0)}% at low specificity. `;
+        } else {
+            interpretation = `Specificity strongly affects positive predictive value: ${(minPosProb * 100).toFixed(0)}% to ${(maxPosProb * 100).toFixed(0)}%. `;
+        }
+
+        interpretation += `Negative tests are less affected by specificity, ranging ${(minNegProb * 100).toFixed(1)}%-${(maxNegProb * 100).toFixed(1)}%.`;
+
+    } else if (xVar === 'lr_pos') {
+        const currentLR = parseFloat(lrPosInput.value);
+
+        if (currentLR > 10) {
+            interpretation = `Strong LR+ (${currentLR.toFixed(1)}) makes positive tests highly informative. `;
+        } else if (currentLR > 5) {
+            interpretation = `Moderate LR+ (${currentLR.toFixed(1)}) provides useful information from positive tests. `;
+        } else if (currentLR < 2) {
+            interpretation = `Weak LR+ (${currentLR.toFixed(1)}) means positive tests add limited diagnostic value. `;
+        }
+
+        interpretation += `At ${(currentPrevalence * 100).toFixed(0)}% prevalence, positive tests yield ${(positiveProbabilities[50] * 100).toFixed(0)}% probability at mid-range LR+.`;
+
+    } else if (xVar === 'lr_neg') {
+        const currentLR = parseFloat(lrNegInput.value);
+
+        if (currentLR < 0.1) {
+            interpretation = `Strong LR- (${currentLR.toFixed(2)}) makes negative tests excellent for ruling out disease. `;
+        } else if (currentLR < 0.3) {
+            interpretation = `Moderate LR- (${currentLR.toFixed(2)}) makes negative tests useful for reducing probability. `;
+        } else {
+            interpretation = `Weak LR- (${currentLR.toFixed(2)}) means negative tests provide limited reassurance. `;
+        }
+
+        interpretation += `At ${(currentPrevalence * 100).toFixed(0)}% prevalence, negative tests reduce probability to ${(negativeProbabilities[50] * 100).toFixed(1)}% at mid-range LR-.`;
+    }
+
+    // Add comparison between positive and negative when useful
+    if (xVar !== 'lr_pos' && xVar !== 'lr_neg') {
+        const posChangeMax = ((maxPosProb - currentPrevalence) / currentPrevalence * 100);
+        const negChangeMax = ((currentPrevalence - minNegProb) / currentPrevalence * 100);
+
+        if (posChangeMax > 300 && negChangeMax > 300) {
+            interpretation += ` Both test results are highly informative at optimal values.`;
+        } else if (posChangeMax > 300) {
+            interpretation += ` Positive tests are more informative than negative ones.`;
+        } else if (negChangeMax > 300) {
+            interpretation += ` Negative tests are more informative than positive ones.`;
+        }
+    }
+
+    interpretationText.textContent = interpretation;
 }
 
 // Update control visibility based on selected x-variable
 function updateControlVisibility() {
     const xVar = xVariableSelect.value;
 
+    // Show all controls
     prevalenceControl.classList.remove('hidden');
     sensitivityControl.classList.remove('hidden');
     specificityControl.classList.remove('hidden');
@@ -329,23 +444,84 @@ function updateControlVisibility() {
     } else if (xVar === 'specificity') {
         specificityControl.classList.add('hidden');
     } else if (xVar === 'lr_pos') {
+        // When LR+ is on x-axis: hide LR+
         lrPosControl.classList.add('hidden');
     } else if (xVar === 'lr_neg') {
+        // When LR- is on x-axis: hide LR-
         lrNegControl.classList.add('hidden');
     }
 }
 
+// Track which slider was adjusted
+let lastAdjustedSlider = null;
+
 // Update dependent parameters when sensitivity or specificity changes
-function updateFromSensSpec() {
+function updateFromSensSpec(adjustedSlider) {
     if (isUpdating) return;
     isUpdating = true;
 
-    const sensitivity = parseFloat(sensitivitySlider.value);
-    const specificity = parseFloat(specificitySlider.value);
-    const { lrPos, lrNeg } = calculateLikelihoodRatios(sensitivity, specificity);
+    const xVar = xVariableSelect.value;
+    let sensitivity = parseFloat(sensitivitySlider.value);
+    let specificity = parseFloat(specificitySlider.value);
 
-    lrPosInput.value = lrPos.toFixed(2);
-    lrNegInput.value = lrNeg.toFixed(2);
+    if (xVar === 'lr_pos') {
+        // If LR+ is on x-axis, keep LR+ constant
+        const lrPos = parseFloat(lrPosInput.value);
+
+        if (adjustedSlider === 'specificity') {
+            // User adjusted specificity, recalculate sensitivity to maintain LR+
+            const newSens = lrPos * (1 - specificity);
+            if (newSens >= 0.01 && newSens <= 0.99) {
+                sensitivitySlider.value = newSens.toFixed(2);
+                sensitivity = newSens;
+            }
+        } else if (adjustedSlider === 'sensitivity') {
+            // User adjusted sensitivity, recalculate specificity to maintain LR+
+            // LR+ = sens / (1 - spec)
+            // Therefore: spec = 1 - (sens / LR+)
+            const newSpec = 1 - (sensitivity / lrPos);
+            if (newSpec >= 0.01 && newSpec <= 0.99) {
+                specificitySlider.value = newSpec.toFixed(2);
+                specificity = newSpec;
+            }
+        }
+
+        // Recalculate LR- with updated values
+        const { lrNeg } = calculateLikelihoodRatios(sensitivity, specificity);
+        lrNegInput.value = lrNeg.toFixed(2);
+
+    } else if (xVar === 'lr_neg') {
+        // If LR- is on x-axis, keep LR- constant
+        const lrNeg = parseFloat(lrNegInput.value);
+
+        if (adjustedSlider === 'sensitivity') {
+            // User adjusted sensitivity, recalculate specificity to maintain LR-
+            const newSpec = (1 - sensitivity) / lrNeg;
+            if (newSpec >= 0.01 && newSpec <= 0.99) {
+                specificitySlider.value = newSpec.toFixed(2);
+                specificity = newSpec;
+            }
+        } else if (adjustedSlider === 'specificity') {
+            // User adjusted specificity, recalculate sensitivity to maintain LR-
+            // LR- = (1 - sens) / spec
+            // Therefore: sens = 1 - (LR- * spec)
+            const newSens = 1 - (lrNeg * specificity);
+            if (newSens >= 0.01 && newSens <= 0.99) {
+                sensitivitySlider.value = newSens.toFixed(2);
+                sensitivity = newSens;
+            }
+        }
+
+        // Recalculate LR+ with updated values
+        const { lrPos } = calculateLikelihoodRatios(sensitivity, specificity);
+        lrPosInput.value = lrPos.toFixed(2);
+
+    } else {
+        // For other x-axis variables, update both LRs normally
+        const { lrPos, lrNeg } = calculateLikelihoodRatios(sensitivity, specificity);
+        lrPosInput.value = lrPos.toFixed(2);
+        lrNegInput.value = lrNeg.toFixed(2);
+    }
 
     updateValueDisplays();
     isUpdating = false;
@@ -395,12 +571,12 @@ prevalenceSlider.addEventListener('input', () => {
 });
 
 sensitivitySlider.addEventListener('input', () => {
-    updateFromSensSpec();
+    updateFromSensSpec('sensitivity');
     updateChart();
 });
 
 specificitySlider.addEventListener('input', () => {
-    updateFromSensSpec();
+    updateFromSensSpec('specificity');
     updateChart();
 });
 
