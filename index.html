@@ -21,8 +21,6 @@
                         <option value="prevalence">Prevalence</option>
                         <option value="sensitivity">Sensitivity</option>
                         <option value="specificity">Specificity</option>
-                        <option value="lr_pos">Likelihood Ratio +</option>
-                        <option value="lr_neg">Likelihood Ratio -</option>
                     </select>
                 </div>
 
@@ -52,28 +50,32 @@
                         <input type="range" id="specificity" min="0.01" max="0.99" step="0.01" value="0.90" class="slider">
                     </div>
 
-                    <div id="lr-pos-control" class="parameter-control">
-                        <label for="lr-pos">
-                            Likelihood Ratio +: <span id="lr-pos-value">9.0</span>
-                        </label>
-                        <input type="number" id="lr-pos" min="0.1" max="100" step="0.1" value="9.0" class="number-input">
-                    </div>
+                </div>
 
-                    <div id="lr-neg-control" class="parameter-control">
-                        <label for="lr-neg">
-                            Likelihood Ratio -: <span id="lr-neg-value">0.11</span>
-                        </label>
-                        <input type="number" id="lr-neg" min="0.01" max="10" step="0.01" value="0.11" class="number-input">
+                <div class="calculated-values">
+                    <h3>Calculated Likelihood Ratios</h3>
+                    <div class="lr-display">
+                        <span class="lr-label">LR+:</span>
+                        <span id="lr-pos-value" class="lr-value">9.00</span>
+                    </div>
+                    <div class="lr-display">
+                        <span class="lr-label">LR-:</span>
+                        <span id="lr-neg-value" class="lr-value">0.11</span>
                     </div>
                 </div>
 
                 <div class="help-text">
-                    <p><strong>Note:</strong> Likelihood ratios are automatically calculated from sensitivity and specificity. When an LR is the x-axis variable, adjusting the shown parameter maintains that LR value.</p>
+                    <p><strong>Note:</strong> Likelihood ratios are automatically calculated from sensitivity and specificity.</p>
                 </div>
             </aside>
 
             <main class="chart-container">
-                <canvas id="probability-chart"></canvas>
+                <div class="chart-wrapper">
+                    <canvas id="probability-chart"></canvas>
+                </div>
+                <div class="chart-wrapper">
+                    <canvas id="predictive-value-chart"></canvas>
+                </div>
                 <div class="interpretation">
                     <h4>Interpretation</h4>
                     <p id="interpretation-text"></p>

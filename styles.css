@@ -154,6 +154,42 @@ hr {
     margin: 25px 0;
 }
 
+.calculated-values {
+    background: #f0f0f0;
+    padding: 15px;
+    border-radius: 6px;
+    margin-top: 20px;
+}
+
+.calculated-values h3 {
+    font-size: 1rem;
+    margin-bottom: 12px;
+    color: #333;
+    font-weight: 600;
+}
+
+.lr-display {
+    display: flex;
+    justify-content: space-between;
+    padding: 8px 0;
+    border-bottom: 1px solid #dee2e6;
+}
+
+.lr-display:last-child {
+    border-bottom: none;
+}
+
+.lr-label {
+    font-weight: 500;
+    color: #495057;
+}
+
+.lr-value {
+    color: #667eea;
+    font-weight: 600;
+    font-family: 'Courier New', monospace;
+}
+
 .help-text {
     background: #e7f3ff;
     padding: 15px;
@@ -172,9 +208,13 @@ hr {
     padding: 40px;
 }
 
-#probability-chart {
-    max-height: 500px;
+.chart-wrapper {
+    position: relative;
     margin-bottom: 30px;
+}
+
+.chart-wrapper canvas {
+    max-height: 400px;
 }
 
 .interpretation {
@@ -198,6 +238,43 @@ hr {
 
 .hidden {
     display: none !important;
+}
+
+/* Crosshair tooltip styles */
+.crosshair-tooltip {
+    position: absolute;
+    background: rgba(0, 0, 0, 0.8);
+    color: white;
+    padding: 8px 12px;
+    border-radius: 4px;
+    font-size: 12px;
+    pointer-events: none;
+    z-index: 100;
+    white-space: nowrap;
+    transform: translateX(-50%);
+}
+
+.crosshair-tooltip .tooltip-x {
+    margin-bottom: 4px;
+    font-weight: 600;
+}
+
+.crosshair-tooltip .tooltip-y {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.crosshair-tooltip .tooltip-y span {
+    display: block;
+}
+
+.tooltip-positive {
+    color: rgb(102, 126, 234);
+}
+
+.tooltip-negative {
+    color: rgb(220, 38, 127);
 }
 
 /* Responsive design */
