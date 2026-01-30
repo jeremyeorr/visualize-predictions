@@ -33,7 +33,7 @@
                         <label for="prevalence">
                             Prevalence: <span id="prevalence-value">0.1</span>
                         </label>
-                        <input type="range" id="prevalence" min="0.001" max="0.99" step="0.001" value="0.1" class="slider">
+                        <input type="range" id="prevalence" min="0.005" max="1" step="0.001" value="0.1" class="slider">
                     </div>
 
                     <div id="sensitivity-control" class="parameter-control">
@@ -72,9 +72,6 @@
             <main class="chart-container">
                 <div class="chart-wrapper">
                     <canvas id="probability-chart"></canvas>
-                </div>
-                <div class="chart-wrapper">
-                    <canvas id="predictive-value-chart"></canvas>
                 </div>
                 <div class="interpretation">
                     <h4>Interpretation</h4>
