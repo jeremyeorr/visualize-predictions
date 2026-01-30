@@ -19,7 +19,6 @@ const lrNegValue = document.getElementById('lr-neg-value');
 
 // Chart setup
 let probabilityChart = null;
-let predictiveValueChart = null;
 
 // Calculate likelihood ratios from sensitivity and specificity
 function calculateLikelihoodRatios(sensitivity, specificity) {
@@ -43,15 +42,6 @@ function calculateProbability(prevalence, sensitivity, specificity, testResult) 
     }
 }
 
-// Calculate PPV and NPV
-function calculatePredictiveValues(prevalence, sensitivity, specificity) {
-    // PPV = P(Disease|+) - same as positive post-test probability
-    const ppv = calculateProbability(prevalence, sensitivity, specificity, 'positive');
-    // NPV = P(No Disease|-) = 1 - P(Disease|-)
-    const npv = 1 - calculateProbability(prevalence, sensitivity, specificity, 'negative');
-    return { ppv, npv };
-}
-
 // Format number to 3 significant figures
 function toSignificantFigures(num, sigFigs) {
     if (num === 0) return '0';
@@ -72,9 +62,9 @@ function generatePlotData() {
 
     // Generate x-axis values based on selected variable
     if (xVar === 'prevalence') {
-        // Logarithmic scale for prevalence: from 0.001 to 0.99
-        const logMin = Math.log10(0.001);
-        const logMax = Math.log10(0.99);
+        // Logarithmic scale for prevalence: from 0.005 to 1
+        const logMin = Math.log10(0.005);
+        const logMax = Math.log10(1);
         xValues = Array.from({length: 100}, (_, i) => {
             const logValue = logMin + (i * (logMax - logMin) / 99);
             return Math.pow(10, logValue);
@@ -88,11 +78,9 @@ function generatePlotData() {
         xLabel = 'Specificity';
     }
 
-    // Calculate probabilities and predictive values for each x value
+    // Calculate probabilities for each x value
     const positiveProbabilities = [];
     const negativeProbabilities = [];
-    const ppvValues = [];
-    const npvValues = [];
 
     xValues.forEach(x => {
         let sens = sensitivity;
@@ -110,13 +98,9 @@ function generatePlotData() {
 
         positiveProbabilities.push(calculateProbability(prev, sens, spec, 'positive'));
         negativeProbabilities.push(calculateProbability(prev, sens, spec, 'negative'));
-
-        const { ppv, npv } = calculatePredictiveValues(prev, sens, spec);
-        ppvValues.push(ppv);
-        npvValues.push(npv);
     });
 
-    return { xValues, positiveProbabilities, negativeProbabilities, ppvValues, npvValues, xLabel };
+    return { xValues, positiveProbabilities, negativeProbabilities, xLabel };
 }
 
 // Custom plugin for crosshair
@@ -247,7 +231,7 @@ function setupCrosshairHandlers(chart, chartId, datasets) {
 
 // Update the charts
 function updateCharts() {
-    const { xValues, positiveProbabilities, negativeProbabilities, ppvValues, npvValues, xLabel } = generatePlotData();
+    const { xValues, positiveProbabilities, negativeProbabilities, xLabel } = generatePlotData();
     const xVar = xVariableSelect.value;
     const isLogScale = xVar === 'prevalence';
 
@@ -282,7 +266,7 @@ function updateCharts() {
         scales: {
             x: {
                 type: isLogScale ? 'logarithmic' : 'linear',
-                min: isLogScale ? 0.001 : undefined,
+                min: isLogScale ? 0.005 : undefined,
                 max: isLogScale ? 1 : undefined,
                 title: {
                     display: true,
@@ -384,7 +368,7 @@ function updateCharts() {
         setupCrosshairHandlers(probabilityChart, 'probability-chart');
     } else {
         probabilityChart.options.scales.x.type = isLogScale ? 'logarithmic' : 'linear';
-        probabilityChart.options.scales.x.min = isLogScale ? 0.001 : undefined;
+        probabilityChart.options.scales.x.min = isLogScale ? 0.005 : undefined;
         probabilityChart.options.scales.x.max = isLogScale ? 1 : undefined;
         probabilityChart.options.scales.x.title.text = xLabel;
         probabilityChart.options.scales.x.ticks.callback = function(value) {
@@ -399,135 +383,103 @@ function updateCharts() {
         probabilityChart.update('none');
     }
 
-    // Create or update predictive value chart
-    if (!predictiveValueChart) {
-        const ctx = document.getElementById('predictive-value-chart').getContext('2d');
+    updateInterpretation(positiveProbabilities, negativeProbabilities, xLabel);
+}
 
-        predictiveValueChart = new Chart(ctx, {
-            type: 'line',
-            data: {
-                labels: xValues,
-                datasets: [
-                    {
-                        label: 'Positive Predictive Value (PPV)',
-                        data: xValues.map((x, i) => ({x: x, y: ppvValues[i]})),
-                        borderColor: 'rgb(102, 126, 234)',
-                        backgroundColor: 'rgba(102, 126, 234, 0.1)',
-                        borderWidth: 3,
-                        fill: true,
-                        tension: 0.4,
-                        pointRadius: 0,
-                        pointHoverRadius: 5
-                    },
-                    {
-                        label: 'Negative Predictive Value (NPV)',
-                        data: xValues.map((x, i) => ({x: x, y: npvValues[i]})),
-                        borderColor: 'rgb(220, 38, 127)',
-                        backgroundColor: 'rgba(220, 38, 127, 0.1)',
-                        borderWidth: 3,
-                        fill: true,
-                        tension: 0.4,
-                        pointRadius: 0,
-                        pointHoverRadius: 5
-                    }
-                ]
-            },
-            options: {
-                ...commonOptions,
-                plugins: {
-                    ...commonOptions.plugins,
-                    title: {
-                        display: true,
-                        text: 'Predictive Values',
-                        font: {
-                            size: 18,
-                            weight: 'bold'
-                        },
-                        padding: 20
-                    }
-                },
-                scales: {
-                    ...commonOptions.scales,
-                    y: {
-                        ...commonOptions.scales.y,
-                        title: {
-                            ...commonOptions.scales.y.title,
-                            text: 'Predictive Value'
-                        }
-                    }
-                }
-            }
-        });
+// Find inflection points and plateaus in a curve
+function analyzeInflectionAndPlateau(values, xValues) {
+    const n = values.length;
 
-        setupCrosshairHandlers(predictiveValueChart, 'predictive-value-chart');
-    } else {
-        predictiveValueChart.options.scales.x.type = isLogScale ? 'logarithmic' : 'linear';
-        predictiveValueChart.options.scales.x.min = isLogScale ? 0.001 : undefined;
-        predictiveValueChart.options.scales.x.max = isLogScale ? 1 : undefined;
-        predictiveValueChart.options.scales.x.title.text = xLabel;
-        predictiveValueChart.options.scales.x.ticks.callback = function(value) {
-            if (isLogScale) {
-                return toSignificantFigures(value, 3);
-            }
-            return value.toFixed(2);
-        };
-        predictiveValueChart.data.labels = xValues;
-        predictiveValueChart.data.datasets[0].data = xValues.map((x, i) => ({x: x, y: ppvValues[i]}));
-        predictiveValueChart.data.datasets[1].data = xValues.map((x, i) => ({x: x, y: npvValues[i]}));
-        predictiveValueChart.update('none');
+    // Calculate first derivative (rate of change)
+    const derivatives = [];
+    for (let i = 1; i < n - 1; i++) {
+        // Use central difference for better accuracy
+        const dx = xValues[i + 1] - xValues[i - 1];
+        const dy = values[i + 1] - values[i - 1];
+        derivatives.push({ index: i, derivative: dy / dx, x: xValues[i], y: values[i] });
     }
 
-    updateInterpretation(positiveProbabilities, negativeProbabilities, ppvValues, npvValues, xLabel);
+    // Find max rate of change (steepest point / inflection region)
+    let maxDerivIdx = 0;
+    let maxDeriv = Math.abs(derivatives[0].derivative);
+    for (let i = 1; i < derivatives.length; i++) {
+        if (Math.abs(derivatives[i].derivative) > maxDeriv) {
+            maxDeriv = Math.abs(derivatives[i].derivative);
+            maxDerivIdx = i;
+        }
+    }
+    const inflectionPoint = derivatives[maxDerivIdx];
+
+    // Detect plateaus: regions where derivative is near zero relative to max
+    const threshold = maxDeriv * 0.1; // 10% of max slope
+    const lowPlateau = derivatives.slice(0, Math.floor(derivatives.length / 3))
+        .filter(d => Math.abs(d.derivative) < threshold);
+    const highPlateau = derivatives.slice(Math.floor(2 * derivatives.length / 3))
+        .filter(d => Math.abs(d.derivative) < threshold);
+
+    return {
+        inflectionPoint,
+        hasLowPlateau: lowPlateau.length > derivatives.length / 6,
+        hasHighPlateau: highPlateau.length > derivatives.length / 6,
+        lowPlateauValue: values[0],
+        highPlateauValue: values[n - 1]
+    };
 }
 
 // Update interpretation text with meaningful insights
-function updateInterpretation(positiveProbabilities, negativeProbabilities, ppvValues, npvValues, xLabel) {
-    const minPosProb = Math.min(...positiveProbabilities);
-    const maxPosProb = Math.max(...positiveProbabilities);
-    const minNegProb = Math.min(...negativeProbabilities);
-    const maxNegProb = Math.max(...negativeProbabilities);
-    const minPPV = Math.min(...ppvValues);
-    const maxPPV = Math.max(...ppvValues);
-    const minNPV = Math.min(...npvValues);
-    const maxNPV = Math.max(...npvValues);
-
+function updateInterpretation(positiveProbabilities, negativeProbabilities, xLabel) {
     const xVar = xVariableSelect.value;
-    const currentPrevalence = parseFloat(prevalenceSlider.value);
+    const { xValues } = generatePlotData();
+
+    const posAnalysis = analyzeInflectionAndPlateau(positiveProbabilities, xValues);
+    const negAnalysis = analyzeInflectionAndPlateau(negativeProbabilities, xValues);
 
     let interpretation = '';
 
-    // Main message based on x-axis variable
     if (xVar === 'prevalence') {
-        const lowPrev = minPosProb < 0.5 && maxPosProb < 0.5;
-        const highPrev = minPosProb > 0.5 && maxPosProb > 0.5;
+        // Describe positive test curve behavior
+        const posInflectionPrev = toSignificantFigures(posAnalysis.inflectionPoint.x, 2);
+        const posInflectionProb = (posAnalysis.inflectionPoint.y * 100).toFixed(0);
 
-        if (lowPrev) {
-            interpretation = `Even with a positive test, post-test probability peaks at ${(maxPosProb * 100).toFixed(0)}% when prevalence is highest. In low-prevalence settings, positive results may require confirmation. `;
-        } else if (highPrev) {
-            interpretation = `In high-prevalence settings, a positive test confirms disease with ${(maxPosProb * 100).toFixed(0)}% probability. `;
-        } else {
-            interpretation = `Post-test probability crosses the 50% threshold as prevalence increases. `;
+        interpretation = `The positive test curve shows its steepest change around prevalence ${posInflectionPrev} (at ${posInflectionProb}% probability). `;
+
+        if (posAnalysis.hasLowPlateau && posAnalysis.hasHighPlateau) {
+            interpretation += `The curve plateaus at both extremes: near ${(posAnalysis.lowPlateauValue * 100).toFixed(0)}% at low prevalence and ${(posAnalysis.highPlateauValue * 100).toFixed(0)}% at high prevalence. `;
+        } else if (posAnalysis.hasHighPlateau) {
+            interpretation += `At high prevalence, the curve plateaus near ${(posAnalysis.highPlateauValue * 100).toFixed(0)}%. `;
+        } else if (posAnalysis.hasLowPlateau) {
+            interpretation += `At low prevalence, the curve plateaus near ${(posAnalysis.lowPlateauValue * 100).toFixed(0)}%. `;
         }
 
-        interpretation += `PPV ranges from ${(minPPV * 100).toFixed(0)}% to ${(maxPPV * 100).toFixed(0)}%, while NPV ranges from ${(minNPV * 100).toFixed(0)}% to ${(maxNPV * 100).toFixed(0)}%.`;
+        // Note about negative test
+        interpretation += `A negative test keeps probability below ${(Math.max(...negativeProbabilities) * 100).toFixed(0)}% across all prevalence values.`;
 
     } else if (xVar === 'sensitivity') {
-        if (maxPosProb > 0.9) {
-            interpretation = `High sensitivity (>80%) makes positive tests highly informative, reaching ${(maxPosProb * 100).toFixed(0)}% probability. `;
-        } else {
-            interpretation = `With current specificity (${(parseFloat(specificitySlider.value) * 100).toFixed(0)}%), positive tests peak at ${(maxPosProb * 100).toFixed(0)}% probability. `;
+        const posInflectionSens = posAnalysis.inflectionPoint.x.toFixed(2);
+        const posInflectionProb = (posAnalysis.inflectionPoint.y * 100).toFixed(0);
+
+        interpretation = `Post-test probability changes most rapidly around sensitivity ${posInflectionSens}. `;
+
+        if (posAnalysis.hasHighPlateau) {
+            interpretation += `Above this point, increasing sensitivity yields diminishing returns as probability plateaus near ${(posAnalysis.highPlateauValue * 100).toFixed(0)}%. `;
         }
 
-        interpretation += `NPV improves from ${(minNPV * 100).toFixed(0)}% to ${(maxNPV * 100).toFixed(0)}% as sensitivity increases.`;
+        interpretation += `Negative test probability drops from ${(negativeProbabilities[0] * 100).toFixed(0)}% to ${(negativeProbabilities[negativeProbabilities.length - 1] * 100).toFixed(0)}% as sensitivity increases.`;
 
     } else if (xVar === 'specificity') {
-        if (minPosProb < 0.3) {
-            interpretation = `Low specificity leads to many false positives - even with a positive test, probability is only ${(minPosProb * 100).toFixed(0)}% at low specificity. `;
-        } else {
-            interpretation = `Specificity strongly affects positive predictive value: PPV ranges from ${(minPPV * 100).toFixed(0)}% to ${(maxPPV * 100).toFixed(0)}%. `;
+        const posInflectionSpec = posAnalysis.inflectionPoint.x.toFixed(2);
+        const posInflectionProb = (posAnalysis.inflectionPoint.y * 100).toFixed(0);
+
+        interpretation = `The positive test curve inflects near specificity ${posInflectionSpec} (${posInflectionProb}% probability). `;
+
+        if (posAnalysis.hasLowPlateau) {
+            interpretation += `At low specificity, false positives dominate and probability plateaus near ${(posAnalysis.lowPlateauValue * 100).toFixed(0)}%. `;
+        }
+        if (posAnalysis.hasHighPlateau) {
+            interpretation += `High specificity (>0.95) offers diminishing returns as the curve flattens near ${(posAnalysis.highPlateauValue * 100).toFixed(0)}%. `;
         }
 
-        interpretation += `Higher specificity greatly improves PPV for ruling in disease.`;
+        interpretation += `Negative test probability remains stable around ${(negativeProbabilities[Math.floor(negativeProbabilities.length / 2)] * 100).toFixed(0)}%.`;
     }
 
     interpretationText.textContent = interpretation;
