@@ -52,6 +52,14 @@ function calculatePredictiveValues(prevalence, sensitivity, specificity) {
     return { ppv, npv };
 }
 
+// Format number to 3 significant figures
+function toSignificantFigures(num, sigFigs) {
+    if (num === 0) return '0';
+    const magnitude = Math.floor(Math.log10(Math.abs(num)));
+    const scale = Math.pow(10, sigFigs - 1 - magnitude);
+    return (Math.round(num * scale) / scale).toString();
+}
+
 // Generate data for plotting
 function generatePlotData() {
     const xVar = xVariableSelect.value;
@@ -64,7 +72,13 @@ function generatePlotData() {
 
     // Generate x-axis values based on selected variable
     if (xVar === 'prevalence') {
-        xValues = Array.from({length: 100}, (_, i) => 0.01 + (i * 0.98 / 99));
+        // Logarithmic scale for prevalence: from 0.001 to 0.99
+        const logMin = Math.log10(0.001);
+        const logMax = Math.log10(0.99);
+        xValues = Array.from({length: 100}, (_, i) => {
+            const logValue = logMin + (i * (logMax - logMin) / 99);
+            return Math.pow(10, logValue);
+        });
         xLabel = 'Prevalence';
     } else if (xVar === 'sensitivity') {
         xValues = Array.from({length: 100}, (_, i) => 0.01 + (i * 0.98 / 99));
@@ -197,7 +211,9 @@ function setupCrosshairHandlers(chart, chartId, datasets) {
             }).filter(v => v !== null);
 
             // Update tooltip content
-            let tooltipContent = `<div class="tooltip-x">${xLabel}: ${xValue.toFixed(2)}</div>`;
+            const xVar = xVariableSelect.value;
+            const xFormatted = xVar === 'prevalence' ? toSignificantFigures(xValue, 3) : xValue.toFixed(2);
+            let tooltipContent = `<div class="tooltip-x">${xLabel}: ${xFormatted}</div>`;
             tooltipContent += '<div class="tooltip-y">';
             yValues.forEach(yv => {
                 const colorClass = yv.label.includes('Positive') || yv.label.includes('PPV') ? 'tooltip-positive' : 'tooltip-negative';
@@ -232,6 +248,8 @@ function setupCrosshairHandlers(chart, chartId, datasets) {
 // Update the charts
 function updateCharts() {
     const { xValues, positiveProbabilities, negativeProbabilities, ppvValues, npvValues, xLabel } = generatePlotData();
+    const xVar = xVariableSelect.value;
+    const isLogScale = xVar === 'prevalence';
 
     const commonOptions = {
         responsive: true,
@@ -263,7 +281,9 @@ function updateCharts() {
         },
         scales: {
             x: {
-                type: 'linear',
+                type: isLogScale ? 'logarithmic' : 'linear',
+                min: isLogScale ? 0.001 : undefined,
+                max: isLogScale ? 1 : undefined,
                 title: {
                     display: true,
                     text: xLabel,
@@ -274,6 +294,9 @@ function updateCharts() {
                 },
                 ticks: {
                     callback: function(value) {
+                        if (isLogScale) {
+                            return toSignificantFigures(value, 3);
+                        }
                         return value.toFixed(2);
                     }
                 }
@@ -360,7 +383,16 @@ function updateCharts() {
 
         setupCrosshairHandlers(probabilityChart, 'probability-chart');
     } else {
+        probabilityChart.options.scales.x.type = isLogScale ? 'logarithmic' : 'linear';
+        probabilityChart.options.scales.x.min = isLogScale ? 0.001 : undefined;
+        probabilityChart.options.scales.x.max = isLogScale ? 1 : undefined;
         probabilityChart.options.scales.x.title.text = xLabel;
+        probabilityChart.options.scales.x.ticks.callback = function(value) {
+            if (isLogScale) {
+                return toSignificantFigures(value, 3);
+            }
+            return value.toFixed(2);
+        };
         probabilityChart.data.labels = xValues;
         probabilityChart.data.datasets[0].data = xValues.map((x, i) => ({x: x, y: positiveProbabilities[i]}));
         probabilityChart.data.datasets[1].data = xValues.map((x, i) => ({x: x, y: negativeProbabilities[i]}));
@@ -429,7 +461,16 @@ function updateCharts() {
 
         setupCrosshairHandlers(predictiveValueChart, 'predictive-value-chart');
     } else {
+        predictiveValueChart.options.scales.x.type = isLogScale ? 'logarithmic' : 'linear';
+        predictiveValueChart.options.scales.x.min = isLogScale ? 0.001 : undefined;
+        predictiveValueChart.options.scales.x.max = isLogScale ? 1 : undefined;
         predictiveValueChart.options.scales.x.title.text = xLabel;
+        predictiveValueChart.options.scales.x.ticks.callback = function(value) {
+            if (isLogScale) {
+                return toSignificantFigures(value, 3);
+            }
+            return value.toFixed(2);
+        };
         predictiveValueChart.data.labels = xValues;
         predictiveValueChart.data.datasets[0].data = xValues.map((x, i) => ({x: x, y: ppvValues[i]}));
         predictiveValueChart.data.datasets[1].data = xValues.map((x, i) => ({x: x, y: npvValues[i]}));
@@ -522,7 +563,7 @@ function updateLRDisplay() {
 
 // Update value displays
 function updateValueDisplays() {
-    prevalenceValue.textContent = parseFloat(prevalenceSlider.value).toFixed(2);
+    prevalenceValue.textContent = toSignificantFigures(parseFloat(prevalenceSlider.value), 3);
     sensitivityValue.textContent = parseFloat(sensitivitySlider.value).toFixed(2);
     specificityValue.textContent = parseFloat(specificitySlider.value).toFixed(2);
     updateLRDisplay();
