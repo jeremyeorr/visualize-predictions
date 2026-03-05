@@ -20,6 +20,7 @@ const lrNegValue = document.getElementById('lr-neg-value');
 // Chart setup
 let probabilityChart = null;
 let predictiveValueChart = null;
+let testProbabilityChart = null;
 
 // Calculate likelihood ratios from sensitivity and specificity
 function calculateLikelihoodRatios(sensitivity, specificity) {
@@ -72,8 +73,8 @@ function generatePlotData() {
 
     // Generate x-axis values based on selected variable
     if (xVar === 'prevalence') {
-        // Logarithmic scale for prevalence: from 0.001 to 0.99
-        const logMin = Math.log10(0.001);
+        // Logarithmic scale for prevalence: from 0.01 to 0.99
+        const logMin = Math.log10(0.01);
         const logMax = Math.log10(0.99);
         xValues = Array.from({length: 100}, (_, i) => {
             const logValue = logMin + (i * (logMax - logMin) / 99);
@@ -93,6 +94,8 @@ function generatePlotData() {
     const negativeProbabilities = [];
     const ppvValues = [];
     const npvValues = [];
+    const pTestPositive = [];
+    const pTestNegative = [];
 
     xValues.forEach(x => {
         let sens = sensitivity;
@@ -114,9 +117,14 @@ function generatePlotData() {
         const { ppv, npv } = calculatePredictiveValues(prev, sens, spec);
         ppvValues.push(ppv);
         npvValues.push(npv);
+
+        // P(test+) = sens*prev + (1-spec)*(1-prev)
+        pTestPositive.push(sens * prev + (1 - spec) * (1 - prev));
+        // P(test-) = (1-sens)*prev + spec*(1-prev)
+        pTestNegative.push((1 - sens) * prev + spec * (1 - prev));
     });
 
-    return { xValues, positiveProbabilities, negativeProbabilities, ppvValues, npvValues, xLabel };
+    return { xValues, positiveProbabilities, negativeProbabilities, ppvValues, npvValues, pTestPositive, pTestNegative, xLabel };
 }
 
 // Custom plugin for crosshair
@@ -247,7 +255,7 @@ function setupCrosshairHandlers(chart, chartId, datasets) {
 
 // Update the charts
 function updateCharts() {
-    const { xValues, positiveProbabilities, negativeProbabilities, ppvValues, npvValues, xLabel } = generatePlotData();
+    const { xValues, positiveProbabilities, negativeProbabilities, ppvValues, npvValues, pTestPositive, pTestNegative, xLabel } = generatePlotData();
     const xVar = xVariableSelect.value;
     const isLogScale = xVar === 'prevalence';
 
@@ -282,7 +290,7 @@ function updateCharts() {
         scales: {
             x: {
                 type: isLogScale ? 'logarithmic' : 'linear',
-                min: isLogScale ? 0.001 : undefined,
+                min: isLogScale ? 0.01 : undefined,
                 max: isLogScale ? 1 : undefined,
                 title: {
                     display: true,
@@ -384,7 +392,7 @@ function updateCharts() {
         setupCrosshairHandlers(probabilityChart, 'probability-chart');
     } else {
         probabilityChart.options.scales.x.type = isLogScale ? 'logarithmic' : 'linear';
-        probabilityChart.options.scales.x.min = isLogScale ? 0.001 : undefined;
+        probabilityChart.options.scales.x.min = isLogScale ? 0.01 : undefined;
         probabilityChart.options.scales.x.max = isLogScale ? 1 : undefined;
         probabilityChart.options.scales.x.title.text = xLabel;
         probabilityChart.options.scales.x.ticks.callback = function(value) {
@@ -462,7 +470,7 @@ function updateCharts() {
         setupCrosshairHandlers(predictiveValueChart, 'predictive-value-chart');
     } else {
         predictiveValueChart.options.scales.x.type = isLogScale ? 'logarithmic' : 'linear';
-        predictiveValueChart.options.scales.x.min = isLogScale ? 0.001 : undefined;
+        predictiveValueChart.options.scales.x.min = isLogScale ? 0.01 : undefined;
         predictiveValueChart.options.scales.x.max = isLogScale ? 1 : undefined;
         predictiveValueChart.options.scales.x.title.text = xLabel;
         predictiveValueChart.options.scales.x.ticks.callback = function(value) {
@@ -475,6 +483,84 @@ function updateCharts() {
         predictiveValueChart.data.datasets[0].data = xValues.map((x, i) => ({x: x, y: ppvValues[i]}));
         predictiveValueChart.data.datasets[1].data = xValues.map((x, i) => ({x: x, y: npvValues[i]}));
         predictiveValueChart.update('none');
+    }
+
+    // Create or update test probability chart
+    if (!testProbabilityChart) {
+        const ctx = document.getElementById('test-probability-chart').getContext('2d');
+
+        testProbabilityChart = new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: xValues,
+                datasets: [
+                    {
+                        label: 'P(Positive Test)',
+                        data: xValues.map((x, i) => ({x: x, y: pTestPositive[i]})),
+                        borderColor: 'rgb(102, 126, 234)',
+                        backgroundColor: 'rgba(102, 126, 234, 0.1)',
+                        borderWidth: 3,
+                        fill: true,
+                        tension: 0.4,
+                        pointRadius: 0,
+                        pointHoverRadius: 5
+                    },
+                    {
+                        label: 'P(Negative Test)',
+                        data: xValues.map((x, i) => ({x: x, y: pTestNegative[i]})),
+                        borderColor: 'rgb(220, 38, 127)',
+                        backgroundColor: 'rgba(220, 38, 127, 0.1)',
+                        borderWidth: 3,
+                        fill: true,
+                        tension: 0.4,
+                        pointRadius: 0,
+                        pointHoverRadius: 5
+                    }
+                ]
+            },
+            options: {
+                ...commonOptions,
+                plugins: {
+                    ...commonOptions.plugins,
+                    title: {
+                        display: true,
+                        text: 'Probability of Test Result',
+                        font: {
+                            size: 18,
+                            weight: 'bold'
+                        },
+                        padding: 20
+                    }
+                },
+                scales: {
+                    ...commonOptions.scales,
+                    y: {
+                        ...commonOptions.scales.y,
+                        title: {
+                            ...commonOptions.scales.y.title,
+                            text: 'Probability of Test Result'
+                        }
+                    }
+                }
+            }
+        });
+
+        setupCrosshairHandlers(testProbabilityChart, 'test-probability-chart');
+    } else {
+        testProbabilityChart.options.scales.x.type = isLogScale ? 'logarithmic' : 'linear';
+        testProbabilityChart.options.scales.x.min = isLogScale ? 0.01 : undefined;
+        testProbabilityChart.options.scales.x.max = isLogScale ? 1 : undefined;
+        testProbabilityChart.options.scales.x.title.text = xLabel;
+        testProbabilityChart.options.scales.x.ticks.callback = function(value) {
+            if (isLogScale) {
+                return toSignificantFigures(value, 3);
+            }
+            return value.toFixed(2);
+        };
+        testProbabilityChart.data.labels = xValues;
+        testProbabilityChart.data.datasets[0].data = xValues.map((x, i) => ({x: x, y: pTestPositive[i]}));
+        testProbabilityChart.data.datasets[1].data = xValues.map((x, i) => ({x: x, y: pTestNegative[i]}));
+        testProbabilityChart.update('none');
     }
 
     updateInterpretation(positiveProbabilities, negativeProbabilities, ppvValues, npvValues, xLabel);
