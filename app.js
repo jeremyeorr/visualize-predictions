@@ -266,8 +266,7 @@ function updateCharts() {
         scales: {
             x: {
                 type: isLogScale ? 'logarithmic' : 'linear',
-                min: isLogScale ? 0.005 : undefined,
-                max: isLogScale ? 1 : undefined,
+                ...(isLogScale ? { min: 0.005, max: 1 } : {}),
                 title: {
                     display: true,
                     text: xLabel,
@@ -368,8 +367,13 @@ function updateCharts() {
         setupCrosshairHandlers(probabilityChart, 'probability-chart');
     } else {
         probabilityChart.options.scales.x.type = isLogScale ? 'logarithmic' : 'linear';
-        probabilityChart.options.scales.x.min = isLogScale ? 0.005 : undefined;
-        probabilityChart.options.scales.x.max = isLogScale ? 1 : undefined;
+        if (isLogScale) {
+            probabilityChart.options.scales.x.min = 0.005;
+            probabilityChart.options.scales.x.max = 1;
+        } else {
+            delete probabilityChart.options.scales.x.min;
+            delete probabilityChart.options.scales.x.max;
+        }
         probabilityChart.options.scales.x.title.text = xLabel;
         probabilityChart.options.scales.x.ticks.callback = function(value) {
             if (isLogScale) {
