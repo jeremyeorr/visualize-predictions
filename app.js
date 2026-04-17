@@ -62,8 +62,8 @@ function generatePlotData() {
 
     // Generate x-axis values based on selected variable
     if (xVar === 'prevalence') {
-        // Logarithmic scale for prevalence: from 0.005 to 1
-        const logMin = Math.log10(0.005);
+        // Logarithmic scale for prevalence: from 0.01 to 1
+        const logMin = Math.log10(0.01);
         const logMax = Math.log10(1);
         xValues = Array.from({length: 100}, (_, i) => {
             const logValue = logMin + (i * (logMax - logMin) / 99);
@@ -266,7 +266,7 @@ function updateCharts() {
         scales: {
             x: {
                 type: isLogScale ? 'logarithmic' : 'linear',
-                ...(isLogScale ? { min: 0.005, max: 1 } : {}),
+                ...(isLogScale ? { min: 0.01, max: 1 } : {}),
                 title: {
                     display: true,
                     text: xLabel,
@@ -368,7 +368,7 @@ function updateCharts() {
     } else {
         probabilityChart.options.scales.x.type = isLogScale ? 'logarithmic' : 'linear';
         if (isLogScale) {
-            probabilityChart.options.scales.x.min = 0.005;
+            probabilityChart.options.scales.x.min = 0.01;
             probabilityChart.options.scales.x.max = 1;
         } else {
             delete probabilityChart.options.scales.x.min;
