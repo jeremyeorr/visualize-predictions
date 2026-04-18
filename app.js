@@ -208,13 +208,11 @@ function setupCrosshairHandlers(chart, chartId, datasets) {
             tooltip.innerHTML = tooltipContent;
             tooltip.style.display = 'block';
 
-            // Position tooltip above the chart, centered on cursor
-            const tooltipX = x;
-            const tooltipY = chartArea.top - 10;
-
+            // Position tooltip inside the chart area near the top, centered on cursor
+            const tooltipX = Math.min(Math.max(x, chartArea.left + 60), chartArea.right - 60);
             tooltip.style.left = `${tooltipX}px`;
-            tooltip.style.bottom = `${canvas.height - tooltipY + 10}px`;
-            tooltip.style.top = 'auto';
+            tooltip.style.top = `${chartArea.top + 10}px`;
+            tooltip.style.bottom = 'auto';
         } else {
             chart.crosshair = null;
             chart.update('none');
@@ -441,49 +439,28 @@ function updateInterpretation(positiveProbabilities, negativeProbabilities, xLab
     let interpretation = '';
 
     if (xVar === 'prevalence') {
-        // Describe positive test curve behavior
-        const posInflectionPrev = toSignificantFigures(posAnalysis.inflectionPoint.x, 2);
-        const posInflectionProb = (posAnalysis.inflectionPoint.y * 100).toFixed(0);
+        const posX = toSignificantFigures(posAnalysis.inflectionPoint.x, 2);
+        const posY = (posAnalysis.inflectionPoint.y * 100).toFixed(0);
+        const negX = toSignificantFigures(negAnalysis.inflectionPoint.x, 2);
 
-        interpretation = `The positive test curve shows its steepest change around prevalence ${posInflectionPrev} (at ${posInflectionProb}% probability). `;
-
-        if (posAnalysis.hasLowPlateau && posAnalysis.hasHighPlateau) {
-            interpretation += `The curve plateaus at both extremes: near ${(posAnalysis.lowPlateauValue * 100).toFixed(0)}% at low prevalence and ${(posAnalysis.highPlateauValue * 100).toFixed(0)}% at high prevalence. `;
-        } else if (posAnalysis.hasHighPlateau) {
-            interpretation += `At high prevalence, the curve plateaus near ${(posAnalysis.highPlateauValue * 100).toFixed(0)}%. `;
-        } else if (posAnalysis.hasLowPlateau) {
-            interpretation += `At low prevalence, the curve plateaus near ${(posAnalysis.lowPlateauValue * 100).toFixed(0)}%. `;
-        }
-
-        // Note about negative test
-        interpretation += `A negative test keeps probability below ${(Math.max(...negativeProbabilities) * 100).toFixed(0)}% across all prevalence values.`;
+        interpretation = `After a positive result, post-test probability rises most steeply near prevalence ${posX} (${posY}%) — a small shift in pre-test probability at this point produces the largest change in diagnostic certainty. `;
+        interpretation += `The negative result curve changes most rapidly near prevalence ${negX}; beyond this point, a negative test provides rapidly diminishing reassurance.`;
 
     } else if (xVar === 'sensitivity') {
-        const posInflectionSens = posAnalysis.inflectionPoint.x.toFixed(2);
-        const posInflectionProb = (posAnalysis.inflectionPoint.y * 100).toFixed(0);
+        const posX = posAnalysis.inflectionPoint.x.toFixed(2);
+        const posY = (posAnalysis.inflectionPoint.y * 100).toFixed(0);
+        const negX = negAnalysis.inflectionPoint.x.toFixed(2);
 
-        interpretation = `Post-test probability changes most rapidly around sensitivity ${posInflectionSens}. `;
-
-        if (posAnalysis.hasHighPlateau) {
-            interpretation += `Above this point, increasing sensitivity yields diminishing returns as probability plateaus near ${(posAnalysis.highPlateauValue * 100).toFixed(0)}%. `;
-        }
-
-        interpretation += `Negative test probability drops from ${(negativeProbabilities[0] * 100).toFixed(0)}% to ${(negativeProbabilities[negativeProbabilities.length - 1] * 100).toFixed(0)}% as sensitivity increases.`;
+        interpretation = `Positive post-test probability rises most steeply near sensitivity ${posX} (${posY}%) — incremental improvements in sensitivity have the greatest impact on PPV in this region. `;
+        interpretation += `The negative result curve falls most steeply near sensitivity ${negX}, where each gain in sensitivity most efficiently reduces post-negative probability.`;
 
     } else if (xVar === 'specificity') {
-        const posInflectionSpec = posAnalysis.inflectionPoint.x.toFixed(2);
-        const posInflectionProb = (posAnalysis.inflectionPoint.y * 100).toFixed(0);
+        const posX = posAnalysis.inflectionPoint.x.toFixed(2);
+        const posY = (posAnalysis.inflectionPoint.y * 100).toFixed(0);
+        const negX = negAnalysis.inflectionPoint.x.toFixed(2);
 
-        interpretation = `The positive test curve inflects near specificity ${posInflectionSpec} (${posInflectionProb}% probability). `;
-
-        if (posAnalysis.hasLowPlateau) {
-            interpretation += `At low specificity, false positives dominate and probability plateaus near ${(posAnalysis.lowPlateauValue * 100).toFixed(0)}%. `;
-        }
-        if (posAnalysis.hasHighPlateau) {
-            interpretation += `High specificity (>0.95) offers diminishing returns as the curve flattens near ${(posAnalysis.highPlateauValue * 100).toFixed(0)}%. `;
-        }
-
-        interpretation += `Negative test probability remains stable around ${(negativeProbabilities[Math.floor(negativeProbabilities.length / 2)] * 100).toFixed(0)}%.`;
+        interpretation = `Positive post-test probability rises most steeply near specificity ${posX} (${posY}%) — this is where each incremental improvement in specificity yields the greatest gain in PPV. `;
+        interpretation += `The negative result curve changes most rapidly near specificity ${negX}; specificity has comparatively little effect on post-negative probability outside this region.`;
     }
 
     interpretationText.textContent = interpretation;
