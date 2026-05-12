@@ -546,7 +546,7 @@ function setupCrosshairHandlers(chart, chartId, mode = 'probability', options = 
 function pointChartOptions(xLabel) {
     return {
         responsive: true,
-        maintainAspectRatio: true,
+        maintainAspectRatio: false,
         animation: {
             duration: 300
         },
@@ -685,7 +685,7 @@ function updatePointChart() {
 function bayesianChartOptions() {
     return {
         responsive: true,
-        maintainAspectRatio: true,
+        maintainAspectRatio: false,
         animation: {
             duration: 300
         },

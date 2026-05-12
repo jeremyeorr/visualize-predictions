@@ -374,6 +374,7 @@ hr {
 
 .chart-wrapper {
     position: relative;
+    height: clamp(380px, 42vw, 520px);
     margin-bottom: 28px;
 }
 
@@ -382,7 +383,9 @@ hr {
 }
 
 .chart-wrapper canvas {
-    max-height: 420px;
+    width: 100% !important;
+    height: 100% !important;
+    max-height: none;
 }
 
 .natural-frequency,
@@ -597,6 +600,10 @@ hr {
     .sidebar,
     .chart-container {
         padding: 20px;
+    }
+
+    .chart-wrapper {
+        height: 430px;
     }
 
     .parameter-heading {
