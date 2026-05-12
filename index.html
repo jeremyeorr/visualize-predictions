@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Post-Test Probability Explorer</title>
-    <link rel="stylesheet" href="styles.css">
+    <link rel="stylesheet" href="styles.css?v=bayesian-distributions">
 </head>
 <body>
     <div class="container">
@@ -15,7 +15,7 @@
 
         <div class="main-content">
             <aside class="sidebar">
-                <div class="control-section">
+                <div id="x-axis-section" class="control-section">
                     <h3>Select X-axis Variable</h3>
                     <select id="x-variable" class="control-input">
                         <option value="prevalence">Prevalence</option>
@@ -31,7 +31,7 @@
 
                     <div id="prevalence-control" class="parameter-control">
                         <div class="parameter-heading">
-                            <label for="prevalence">Prevalence</label>
+                            <label for="prevalence">Prevalence / prior mean</label>
                             <div class="percent-field">
                                 <input type="text" id="prevalence-input" value="10" inputmode="decimal" aria-label="Prevalence percent">
                                 <span aria-hidden="true">%</span>
@@ -64,6 +64,19 @@
 
                 </div>
 
+                <div id="prior-strength-control" class="control-section hidden">
+                    <h3>Prior Strength</h3>
+                    <div class="parameter-control">
+                        <div class="parameter-heading">
+                            <label for="prior-strength">Equivalent patients</label>
+                            <div class="number-field">
+                                <input type="text" id="prior-strength-input" value="20" inputmode="numeric" aria-label="Prior strength equivalent patients input">
+                            </div>
+                        </div>
+                        <input type="range" id="prior-strength" min="2" max="500" step="1" value="20" class="slider" aria-label="Prior strength equivalent patients slider">
+                    </div>
+                </div>
+
                 <div class="calculated-values">
                     <h3>Calculated Likelihood Ratios</h3>
                     <div class="lr-display">
@@ -82,6 +95,11 @@
             </aside>
 
             <main class="chart-container">
+                <div class="tab-controls" role="tablist" aria-label="Explorer view">
+                    <button type="button" id="point-tab" class="tab-button active" data-tab="point" role="tab" aria-selected="true" aria-controls="point-panel">Point Estimate</button>
+                    <button type="button" id="bayesian-tab" class="tab-button" data-tab="bayesian" role="tab" aria-selected="false" aria-controls="bayesian-panel">Bayesian Distributions</button>
+                </div>
+
                 <div class="export-actions" aria-label="Export actions">
                     <button type="button" id="copy-calculation" class="action-button">Copy calculation</button>
                     <button type="button" id="export-png" class="action-button">Export PNG</button>
@@ -89,19 +107,89 @@
                     <button type="button" id="copy-link" class="action-button">Copy link</button>
                     <p id="export-status" class="export-status" aria-live="polite"></p>
                 </div>
-                <div class="chart-wrapper">
-                    <canvas id="probability-chart"></canvas>
+
+                <div id="point-panel" class="tab-panel" role="tabpanel" aria-labelledby="point-tab">
+                    <div class="chart-wrapper">
+                        <canvas id="probability-chart"></canvas>
+                    </div>
+                    <div class="interpretation">
+                        <h4>Interpretation</h4>
+                        <p id="interpretation-text"></p>
+                    </div>
                 </div>
-                <div class="interpretation">
-                    <h4>Interpretation</h4>
-                    <p id="interpretation-text"></p>
+
+                <div id="bayesian-panel" class="tab-panel hidden" role="tabpanel" aria-labelledby="bayesian-tab">
+                    <div class="summary-grid" aria-label="Bayesian distribution summaries">
+                        <article class="summary-card">
+                            <h4>Prior</h4>
+                            <dl>
+                                <div>
+                                    <dt>Mean</dt>
+                                    <dd id="prior-mean-value">10%</dd>
+                                </div>
+                                <div>
+                                    <dt>Median</dt>
+                                    <dd id="prior-median-value">10%</dd>
+                                </div>
+                                <div>
+                                    <dt>95% interval</dt>
+                                    <dd id="prior-interval-value">--</dd>
+                                </div>
+                            </dl>
+                        </article>
+
+                        <article class="summary-card positive-card">
+                            <h4>Positive result</h4>
+                            <dl>
+                                <div>
+                                    <dt>Mean</dt>
+                                    <dd id="positive-mean-value">--</dd>
+                                </div>
+                                <div>
+                                    <dt>Median</dt>
+                                    <dd id="positive-median-value">--</dd>
+                                </div>
+                                <div>
+                                    <dt>95% interval</dt>
+                                    <dd id="positive-interval-value">--</dd>
+                                </div>
+                            </dl>
+                        </article>
+
+                        <article class="summary-card negative-card">
+                            <h4>Negative result</h4>
+                            <dl>
+                                <div>
+                                    <dt>Mean</dt>
+                                    <dd id="negative-mean-value">--</dd>
+                                </div>
+                                <div>
+                                    <dt>Median</dt>
+                                    <dd id="negative-median-value">--</dd>
+                                </div>
+                                <div>
+                                    <dt>95% interval</dt>
+                                    <dd id="negative-interval-value">--</dd>
+                                </div>
+                            </dl>
+                        </article>
+                    </div>
+
+                    <div class="chart-wrapper">
+                        <canvas id="bayesian-chart"></canvas>
+                    </div>
+                    <div class="interpretation">
+                        <h4>Bayesian Interpretation</h4>
+                        <p id="bayesian-interpretation-text"></p>
+                    </div>
                 </div>
+
                 <p class="clinical-disclaimer">Educational use only. Apply with clinical context and validated test characteristics; this is not medical advice.</p>
             </main>
         </div>
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
-    <script src="app.js"></script>
+    <script src="app.js?v=bayesian-distributions"></script>
 </body>
 </html>
