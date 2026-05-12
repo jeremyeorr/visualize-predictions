@@ -11,7 +11,7 @@ const bayesianPanel = document.getElementById('bayesian-panel');
 
 const parameters = {
     prevalence: {
-        label: 'Prevalence',
+        label: 'Pre-test probability',
         min: 0.005,
         max: 1,
         slider: document.getElementById('prevalence'),
@@ -764,7 +764,7 @@ function updateBayesianSummary(data) {
     updateSummaryCard('positive', summaries.positive);
     updateSummaryCard('negative', summaries.negative);
 
-    bayesianInterpretationText.textContent = `With a prior mean of ${formatPercentValue(scenario.prevalence)} and ${strength} equivalent patients, the prior 95% interval is ${formatInterval(summaries.prior)}. A positive result shifts the posterior median to ${formatPercentValue(summaries.positive.median)} (${formatInterval(summaries.positive)}), while a negative result shifts it to ${formatPercentValue(summaries.negative.median)} (${formatInterval(summaries.negative)}).`;
+    bayesianInterpretationText.textContent = `With a prior mean of ${formatPercentValue(scenario.prevalence)} and prior certainty equal to ${strength} equivalent patients, the prior 95% interval is ${formatInterval(summaries.prior)}. A positive result shifts the posterior median to ${formatPercentValue(summaries.positive.median)} (${formatInterval(summaries.positive)}), while a negative result shifts it to ${formatPercentValue(summaries.negative.median)} (${formatInterval(summaries.negative)}).`;
 }
 
 function updateControlVisibility() {
@@ -950,7 +950,7 @@ function buildBayesianCalculationText() {
     return [
         'Post-Test Probability Explorer - Bayesian Distributions',
         `Prior mean: ${formatPercentValue(scenario.prevalence, 2)}`,
-        `Prior strength: ${strength} equivalent patients`,
+        `Prior certainty: ${strength} equivalent patients`,
         `Sensitivity: ${formatPercentValue(scenario.sensitivity, 2)}`,
         `Specificity: ${formatPercentValue(scenario.specificity, 2)}`,
         `LR+: ${scenario.lrPos.toFixed(2)}`,

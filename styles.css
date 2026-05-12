@@ -58,6 +58,12 @@ header h1 {
     grid-template-columns: minmax(330px, 380px) 1fr;
 }
 
+.top-tab-bar {
+    padding: 16px 28px;
+    border-bottom: 1px solid var(--line);
+    background: white;
+}
+
 .sidebar {
     background: var(--panel);
     padding: 28px;
@@ -183,6 +189,13 @@ header h1 {
     outline: none;
 }
 
+.field-note {
+    margin-top: 9px;
+    color: var(--muted);
+    font-size: 0.88rem;
+    line-height: 1.4;
+}
+
 .slider {
     width: 100%;
     height: 6px;
@@ -282,7 +295,6 @@ hr {
     display: inline-flex;
     gap: 4px;
     padding: 4px;
-    margin-bottom: 18px;
     border: 1px solid var(--line);
     border-radius: 8px;
     background: var(--panel);

@@ -5,7 +5,7 @@ A browser-based educational tool for exploring how diagnostic test characteristi
 ## Features
 
 - Visualize how post-test probability changes across the full range of:
-  - Prevalence
+  - Pre-test probability
   - Sensitivity
   - Specificity
   - Likelihood Ratio + (positive)
@@ -16,7 +16,7 @@ A browser-based educational tool for exploring how diagnostic test characteristi
 - Calculate probability for both positive and negative test results
 - Use percent labels throughout the interface
 - Switch to a Bayesian distributions tab that shows prior, positive-result posterior, and negative-result posterior disease-risk distributions
-- Control Bayesian prior strength with an intuitive equivalent-patients input
+- Control Bayesian prior certainty with an equivalent-patients input that narrows or widens the prior distribution
 - Copy a calculation summary, export the chart as PNG, export plotted data as CSV, or copy a permalink with encoded parameters
 - Responsive design works on desktop and mobile
 
@@ -42,7 +42,7 @@ Simply open `index.html` in your web browser. No installation or server required
 
 ## Understanding the Parameters
 
-- **Prevalence**: The proportion of the population that has the disease (pre-test probability)
+- **Pre-test probability**: The estimated probability that the patient has the disease before the test result is known
 - **Sensitivity**: The probability that the test is positive given the person has the disease
 - **Specificity**: The probability that the test is negative given the person does not have the disease
 - **Likelihood Ratio +**: Ratio of true positive rate to false positive rate (Sensitivity / (1-Specificity))

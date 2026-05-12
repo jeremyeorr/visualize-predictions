@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Post-Test Probability Explorer</title>
-    <link rel="stylesheet" href="styles.css?v=bayesian-distributions">
+    <link rel="stylesheet" href="styles.css?v=pretest-probability">
 </head>
 <body>
     <div class="container">
@@ -13,12 +13,19 @@
             <p class="subtitle">Explore how diagnostic test characteristics shift pre-test probability.</p>
         </header>
 
+        <div class="top-tab-bar">
+            <div class="tab-controls" role="tablist" aria-label="Explorer view">
+                <button type="button" id="point-tab" class="tab-button active" data-tab="point" role="tab" aria-selected="true" aria-controls="point-panel">Point Estimate</button>
+                <button type="button" id="bayesian-tab" class="tab-button" data-tab="bayesian" role="tab" aria-selected="false" aria-controls="bayesian-panel">Bayesian Distributions</button>
+            </div>
+        </div>
+
         <div class="main-content">
             <aside class="sidebar">
                 <div id="x-axis-section" class="control-section">
                     <h3>Select X-axis Variable</h3>
                     <select id="x-variable" class="control-input">
-                        <option value="prevalence">Prevalence</option>
+                        <option value="prevalence">Pre-test probability</option>
                         <option value="sensitivity">Sensitivity</option>
                         <option value="specificity">Specificity</option>
                     </select>
@@ -31,13 +38,13 @@
 
                     <div id="prevalence-control" class="parameter-control">
                         <div class="parameter-heading">
-                            <label for="prevalence">Prevalence / prior mean</label>
+                            <label for="prevalence">Pre-test probability / prior mean</label>
                             <div class="percent-field">
-                                <input type="text" id="prevalence-input" value="10" inputmode="decimal" aria-label="Prevalence percent">
+                                <input type="text" id="prevalence-input" value="10" inputmode="decimal" aria-label="Pre-test probability percent">
                                 <span aria-hidden="true">%</span>
                             </div>
                         </div>
-                        <input type="range" id="prevalence" min="0.005" max="1" step="0.0001" value="0.1" class="slider" aria-label="Prevalence">
+                        <input type="range" id="prevalence" min="0.005" max="1" step="0.0001" value="0.1" class="slider" aria-label="Pre-test probability">
                     </div>
 
                     <div id="sensitivity-control" class="parameter-control">
@@ -65,15 +72,16 @@
                 </div>
 
                 <div id="prior-strength-control" class="control-section hidden">
-                    <h3>Prior Strength</h3>
+                    <h3>Prior Certainty</h3>
                     <div class="parameter-control">
                         <div class="parameter-heading">
-                            <label for="prior-strength">Equivalent patients</label>
+                            <label for="prior-strength">Prior sample size</label>
                             <div class="number-field">
-                                <input type="text" id="prior-strength-input" value="20" inputmode="numeric" aria-label="Prior strength equivalent patients input">
+                                <input type="text" id="prior-strength-input" value="20" inputmode="numeric" aria-label="Prior sample size equivalent patients input" aria-describedby="prior-strength-note">
                             </div>
                         </div>
-                        <input type="range" id="prior-strength" min="2" max="500" step="1" value="20" class="slider" aria-label="Prior strength equivalent patients slider">
+                        <input type="range" id="prior-strength" min="2" max="500" step="1" value="20" class="slider" aria-label="Prior sample size equivalent patients slider" aria-describedby="prior-strength-note">
+                        <p id="prior-strength-note" class="field-note">Measured as equivalent patients: fewer makes the prior wider; more makes it narrower.</p>
                     </div>
                 </div>
 
@@ -95,11 +103,6 @@
             </aside>
 
             <main class="chart-container">
-                <div class="tab-controls" role="tablist" aria-label="Explorer view">
-                    <button type="button" id="point-tab" class="tab-button active" data-tab="point" role="tab" aria-selected="true" aria-controls="point-panel">Point Estimate</button>
-                    <button type="button" id="bayesian-tab" class="tab-button" data-tab="bayesian" role="tab" aria-selected="false" aria-controls="bayesian-panel">Bayesian Distributions</button>
-                </div>
-
                 <div class="export-actions" aria-label="Export actions">
                     <button type="button" id="copy-calculation" class="action-button">Copy calculation</button>
                     <button type="button" id="export-png" class="action-button">Export PNG</button>
@@ -190,6 +193,6 @@
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
-    <script src="app.js?v=bayesian-distributions"></script>
+    <script src="app.js?v=pretest-probability"></script>
 </body>
 </html>
