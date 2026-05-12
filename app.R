@@ -3,7 +3,7 @@ library(ggplot2)
 
 # Define UI
 ui <- fluidPage(
-  titlePanel("Disease Probability Visualizer"),
+  titlePanel("Post-Test Probability Explorer"),
 
   sidebarLayout(
     sidebarPanel(

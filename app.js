@@ -1,154 +1,208 @@
-// Get DOM elements
 const xVariableSelect = document.getElementById('x-variable');
-const prevalenceSlider = document.getElementById('prevalence');
-const sensitivitySlider = document.getElementById('sensitivity');
-const specificitySlider = document.getElementById('specificity');
 const interpretationText = document.getElementById('interpretation-text');
-
-// Control visibility elements
-const prevalenceControl = document.getElementById('prevalence-control');
-const sensitivityControl = document.getElementById('sensitivity-control');
-const specificityControl = document.getElementById('specificity-control');
-
-// Value display elements
-const prevalenceValue = document.getElementById('prevalence-value');
-const sensitivityValue = document.getElementById('sensitivity-value');
-const specificityValue = document.getElementById('specificity-value');
 const lrPosValue = document.getElementById('lr-pos-value');
 const lrNegValue = document.getElementById('lr-neg-value');
+const exportStatus = document.getElementById('export-status');
 
-// Chart setup
+const parameters = {
+    prevalence: {
+        label: 'Prevalence',
+        min: 0.005,
+        max: 1,
+        slider: document.getElementById('prevalence'),
+        input: document.getElementById('prevalence-input'),
+        control: document.getElementById('prevalence-control')
+    },
+    sensitivity: {
+        label: 'Sensitivity',
+        min: 0.01,
+        max: 0.99,
+        slider: document.getElementById('sensitivity'),
+        input: document.getElementById('sensitivity-input'),
+        control: document.getElementById('sensitivity-control')
+    },
+    specificity: {
+        label: 'Specificity',
+        min: 0.01,
+        max: 0.99,
+        slider: document.getElementById('specificity'),
+        input: document.getElementById('specificity-input'),
+        control: document.getElementById('specificity-control')
+    }
+};
+
 let probabilityChart = null;
+let statusTimeout = null;
 
-// Calculate likelihood ratios from sensitivity and specificity
-function calculateLikelihoodRatios(sensitivity, specificity) {
-    const lrPos = sensitivity / (1 - specificity);
-    const lrNeg = (1 - sensitivity) / specificity;
-    return { lrPos, lrNeg };
+function clamp(value, min, max) {
+    return Math.min(Math.max(value, min), max);
 }
 
-// Calculate post-test probability using Bayes' theorem
+function trimTrailingZeros(value) {
+    return value.replace(/\.0+$/, '').replace(/(\.\d*?)0+$/, '$1');
+}
+
+function formatPercentValue(probability, decimals = 1) {
+    if (!Number.isFinite(probability)) return 'N/A';
+    return `${trimTrailingZeros((probability * 100).toFixed(decimals))}%`;
+}
+
+function formatPercentInput(probability) {
+    return trimTrailingZeros((probability * 100).toFixed(2));
+}
+
+function formatAxisPercent(probability) {
+    const percent = probability * 100;
+
+    if (percent < 1) return `${trimTrailingZeros(percent.toFixed(2))}%`;
+    if (percent < 10) return `${trimTrailingZeros(percent.toFixed(1))}%`;
+    return `${trimTrailingZeros(percent.toFixed(0))}%`;
+}
+
+function parsePercentInput(rawValue) {
+    const normalized = String(rawValue).replace('%', '').trim();
+    if (!normalized) return null;
+
+    const percent = Number(normalized);
+    if (!Number.isFinite(percent)) return null;
+
+    return percent / 100;
+}
+
+function parameterValue(name) {
+    return parseFloat(parameters[name].slider.value);
+}
+
+function currentScenario() {
+    const prevalence = parameterValue('prevalence');
+    const sensitivity = parameterValue('sensitivity');
+    const specificity = parameterValue('specificity');
+    const { lrPos, lrNeg } = calculateLikelihoodRatios(sensitivity, specificity);
+    const positiveProbability = calculateProbability(prevalence, sensitivity, specificity, 'positive');
+    const negativeProbability = calculateProbability(prevalence, sensitivity, specificity, 'negative');
+
+    return {
+        prevalence,
+        sensitivity,
+        specificity,
+        lrPos,
+        lrNeg,
+        positiveProbability,
+        negativeProbability
+    };
+}
+
+function calculateLikelihoodRatios(sensitivity, specificity) {
+    return {
+        lrPos: sensitivity / (1 - specificity),
+        lrNeg: (1 - sensitivity) / specificity
+    };
+}
+
 function calculateProbability(prevalence, sensitivity, specificity, testResult) {
     if (testResult === 'positive') {
-        // P(Disease|+) = [Sensitivity * Prevalence] / [Sensitivity * Prevalence + (1-Specificity) * (1-Prevalence)]
         const numerator = sensitivity * prevalence;
-        const denominator = sensitivity * prevalence + (1 - specificity) * (1 - prevalence);
-        return numerator / denominator;
-    } else {
-        // P(Disease|-) = [(1-Sensitivity) * Prevalence] / [(1-Sensitivity) * Prevalence + Specificity * (1-Prevalence)]
-        const numerator = (1 - sensitivity) * prevalence;
-        const denominator = (1 - sensitivity) * prevalence + specificity * (1 - prevalence);
+        const denominator = numerator + (1 - specificity) * (1 - prevalence);
         return numerator / denominator;
     }
+
+    const numerator = (1 - sensitivity) * prevalence;
+    const denominator = numerator + specificity * (1 - prevalence);
+    return numerator / denominator;
 }
 
-// Format number to 3 significant figures
-function toSignificantFigures(num, sigFigs) {
-    if (num === 0) return '0';
-    const magnitude = Math.floor(Math.log10(Math.abs(num)));
-    const scale = Math.pow(10, sigFigs - 1 - magnitude);
-    return (Math.round(num * scale) / scale).toString();
-}
-
-// Generate data for plotting
 function generatePlotData() {
     const xVar = xVariableSelect.value;
-    const prevalence = parseFloat(prevalenceSlider.value);
-    const sensitivity = parseFloat(sensitivitySlider.value);
-    const specificity = parseFloat(specificitySlider.value);
-
+    const { prevalence, sensitivity, specificity } = currentScenario();
     let xValues = [];
-    let xLabel = '';
 
-    // Generate x-axis values based on selected variable
     if (xVar === 'prevalence') {
-        // Logarithmic scale for prevalence: from 0.005 to 1
-        const logMin = Math.log10(0.005);
-        const logMax = Math.log10(1);
-        xValues = Array.from({length: 100}, (_, i) => {
+        const logMin = Math.log10(parameters.prevalence.min);
+        const logMax = Math.log10(parameters.prevalence.max);
+        xValues = Array.from({ length: 100 }, (_, i) => {
             const logValue = logMin + (i * (logMax - logMin) / 99);
             return Math.pow(10, logValue);
         });
-        xLabel = 'Prevalence';
-    } else if (xVar === 'sensitivity') {
-        xValues = Array.from({length: 100}, (_, i) => 0.01 + (i * 0.98 / 99));
-        xLabel = 'Sensitivity';
-    } else if (xVar === 'specificity') {
-        xValues = Array.from({length: 100}, (_, i) => 0.01 + (i * 0.98 / 99));
-        xLabel = 'Specificity';
+    } else {
+        xValues = Array.from({ length: 100 }, (_, i) => 0.01 + (i * 0.98 / 99));
     }
 
-    // Calculate probabilities for each x value
     const positiveProbabilities = [];
     const negativeProbabilities = [];
 
     xValues.forEach(x => {
-        let sens = sensitivity;
-        let spec = specificity;
-        let prev = prevalence;
+        const point = {
+            prevalence,
+            sensitivity,
+            specificity
+        };
 
-        // Determine which variable is varying
-        if (xVar === 'prevalence') {
-            prev = x;
-        } else if (xVar === 'sensitivity') {
-            sens = x;
-        } else if (xVar === 'specificity') {
-            spec = x;
-        }
+        point[xVar] = x;
 
-        positiveProbabilities.push(calculateProbability(prev, sens, spec, 'positive'));
-        negativeProbabilities.push(calculateProbability(prev, sens, spec, 'negative'));
+        positiveProbabilities.push(
+            calculateProbability(point.prevalence, point.sensitivity, point.specificity, 'positive')
+        );
+        negativeProbabilities.push(
+            calculateProbability(point.prevalence, point.sensitivity, point.specificity, 'negative')
+        );
     });
 
-    return { xValues, positiveProbabilities, negativeProbabilities, xLabel };
+    return {
+        xValues,
+        positiveProbabilities,
+        negativeProbabilities,
+        xLabel: parameters[xVar].label
+    };
 }
 
-// Custom plugin for crosshair
-const crosshairPlugin = {
-    id: 'crosshair',
-    afterDraw: function(chart) {
-        if (chart.crosshair && chart.crosshair.x !== undefined) {
-            const ctx = chart.ctx;
-            const chartArea = chart.chartArea;
-            const x = chart.crosshair.x;
-
-            // Draw vertical line
-            ctx.save();
-            ctx.beginPath();
-            ctx.moveTo(x, chartArea.top);
-            ctx.lineTo(x, chartArea.bottom);
-            ctx.lineWidth = 1;
-            ctx.strokeStyle = 'rgba(0, 0, 0, 0.5)';
-            ctx.setLineDash([5, 5]);
-            ctx.stroke();
-            ctx.restore();
-        }
+const chartBackgroundPlugin = {
+    id: 'chartBackground',
+    beforeDraw(chart, args, options) {
+        const { ctx, width, height } = chart;
+        ctx.save();
+        ctx.globalCompositeOperation = 'destination-over';
+        ctx.fillStyle = options.color || '#ffffff';
+        ctx.fillRect(0, 0, width, height);
+        ctx.restore();
     }
 };
 
-// Register the crosshair plugin
-Chart.register(crosshairPlugin);
+const crosshairPlugin = {
+    id: 'crosshair',
+    afterDraw(chart) {
+        if (!chart.crosshair || chart.crosshair.x === undefined) return;
 
-// Create tooltip element for a chart
+        const ctx = chart.ctx;
+        const chartArea = chart.chartArea;
+
+        ctx.save();
+        ctx.beginPath();
+        ctx.moveTo(chart.crosshair.x, chartArea.top);
+        ctx.lineTo(chart.crosshair.x, chartArea.bottom);
+        ctx.lineWidth = 1;
+        ctx.strokeStyle = 'rgba(31, 41, 55, 0.55)';
+        ctx.setLineDash([5, 5]);
+        ctx.stroke();
+        ctx.restore();
+    }
+};
+
+Chart.register(chartBackgroundPlugin, crosshairPlugin);
+
 function createTooltipElement(chartId) {
     const existingTooltip = document.getElementById(`tooltip-${chartId}`);
-    if (existingTooltip) {
-        return existingTooltip;
-    }
+    if (existingTooltip) return existingTooltip;
 
     const tooltip = document.createElement('div');
     tooltip.id = `tooltip-${chartId}`;
     tooltip.className = 'crosshair-tooltip';
     tooltip.style.display = 'none';
 
-    const chartWrapper = document.getElementById(chartId).parentElement;
-    chartWrapper.appendChild(tooltip);
-
+    document.getElementById(chartId).parentElement.appendChild(tooltip);
     return tooltip;
 }
 
-// Handle mouse move for crosshair
-function setupCrosshairHandlers(chart, chartId, datasets) {
+function setupCrosshairHandlers(chart, chartId) {
     const canvas = chart.canvas;
     const tooltip = createTooltipElement(chartId);
 
@@ -156,70 +210,51 @@ function setupCrosshairHandlers(chart, chartId, datasets) {
         const rect = canvas.getBoundingClientRect();
         const x = e.clientX - rect.left;
         const y = e.clientY - rect.top;
-
         const chartArea = chart.chartArea;
 
-        // Check if mouse is within chart area
-        if (x >= chartArea.left && x <= chartArea.right && y >= chartArea.top && y <= chartArea.bottom) {
-            chart.crosshair = { x: x };
-            chart.update('none');
-
-            // Get x value at this position
-            const xScale = chart.scales.x;
-            const xValue = xScale.getValueForPixel(x);
-
-            // Find closest data point
-            const data = chart.data.datasets[0].data;
-            let closestIndex = 0;
-            let closestDistance = Infinity;
-
-            for (let i = 0; i < data.length; i++) {
-                const distance = Math.abs(data[i].x - xValue);
-                if (distance < closestDistance) {
-                    closestDistance = distance;
-                    closestIndex = i;
-                }
-            }
-
-            // Get y values for both datasets at this x position
-            const xLabel = chart.options.scales.x.title.text;
-            const yValues = chart.data.datasets.map(ds => {
-                if (ds.data[closestIndex]) {
-                    return {
-                        label: ds.label,
-                        value: ds.data[closestIndex].y,
-                        color: ds.borderColor
-                    };
-                }
-                return null;
-            }).filter(v => v !== null);
-
-            // Update tooltip content
-            const xVar = xVariableSelect.value;
-            const xFormatted = xVar === 'prevalence' ? toSignificantFigures(xValue, 3) : xValue.toFixed(2);
-            let tooltipContent = `<div class="tooltip-x">${xLabel}: ${xFormatted}</div>`;
-            tooltipContent += '<div class="tooltip-y">';
-            yValues.forEach(yv => {
-                const colorClass = yv.label.includes('Positive') || yv.label.includes('PPV') ? 'tooltip-positive' : 'tooltip-negative';
-                tooltipContent += `<span class="${colorClass}">${yv.label}: ${(yv.value * 100).toFixed(1)}%</span>`;
-            });
-            tooltipContent += '</div>';
-
-            tooltip.innerHTML = tooltipContent;
-            tooltip.style.display = 'block';
-
-            // Position tooltip above the chart, centered on cursor
-            const tooltipX = x;
-            const tooltipY = chartArea.top - 10;
-
-            tooltip.style.left = `${tooltipX}px`;
-            tooltip.style.bottom = `${canvas.height - tooltipY + 10}px`;
-            tooltip.style.top = 'auto';
-        } else {
+        if (x < chartArea.left || x > chartArea.right || y < chartArea.top || y > chartArea.bottom) {
             chart.crosshair = null;
             chart.update('none');
             tooltip.style.display = 'none';
+            return;
         }
+
+        chart.crosshair = { x };
+        chart.update('none');
+
+        const xScale = chart.scales.x;
+        const xValue = xScale.getValueForPixel(x);
+        const data = chart.data.datasets[0].data;
+        let closestIndex = 0;
+        let closestDistance = Infinity;
+
+        for (let i = 0; i < data.length; i++) {
+            const distance = Math.abs(data[i].x - xValue);
+            if (distance < closestDistance) {
+                closestDistance = distance;
+                closestIndex = i;
+            }
+        }
+
+        let tooltipContent = `<div class="tooltip-x">${chart.options.scales.x.title.text}: ${formatPercentValue(data[closestIndex].x, 2)}</div>`;
+        tooltipContent += '<div class="tooltip-y">';
+
+        chart.data.datasets.forEach(ds => {
+            const point = ds.data[closestIndex];
+            if (!point) return;
+
+            const colorClass = ds.label.toLowerCase().includes('positive')
+                ? 'tooltip-positive'
+                : 'tooltip-negative';
+            tooltipContent += `<span class="${colorClass}">${ds.label}: ${formatPercentValue(point.y, 1)}</span>`;
+        });
+
+        tooltipContent += '</div>';
+        tooltip.innerHTML = tooltipContent;
+        tooltip.style.display = 'block';
+        tooltip.style.left = `${x}px`;
+        tooltip.style.bottom = `${canvas.height - chartArea.top + 10}px`;
+        tooltip.style.top = 'auto';
     });
 
     canvas.addEventListener('mouseleave', function() {
@@ -229,7 +264,6 @@ function setupCrosshairHandlers(chart, chartId, datasets) {
     });
 }
 
-// Update the charts
 function updateCharts() {
     const { xValues, positiveProbabilities, negativeProbabilities, xLabel } = generatePlotData();
     const xVar = xVariableSelect.value;
@@ -246,6 +280,9 @@ function updateCharts() {
             intersect: false
         },
         plugins: {
+            chartBackground: {
+                color: '#ffffff'
+            },
             legend: {
                 display: true,
                 position: 'top',
@@ -260,14 +297,14 @@ function updateCharts() {
                 }
             },
             tooltip: {
-                enabled: false // Disable default tooltip, use our custom crosshair
+                enabled: false
             }
         },
         scales: {
             x: {
                 type: isLogScale ? 'logarithmic' : 'linear',
-                min: isLogScale ? 0.005 : undefined,
-                max: isLogScale ? 1 : undefined,
+                min: isLogScale ? parameters.prevalence.min : 0.01,
+                max: isLogScale ? parameters.prevalence.max : 0.99,
                 title: {
                     display: true,
                     text: xLabel,
@@ -278,17 +315,14 @@ function updateCharts() {
                 },
                 ticks: {
                     callback: function(value) {
-                        if (isLogScale) {
-                            return toSignificantFigures(value, 3);
-                        }
-                        return value.toFixed(2);
+                        return formatAxisPercent(Number(value));
                     }
                 }
             },
             y: {
                 title: {
                     display: true,
-                    text: '',
+                    text: 'Post-test probability',
                     font: {
                         size: 14,
                         weight: 'bold'
@@ -298,14 +332,38 @@ function updateCharts() {
                 max: 1,
                 ticks: {
                     callback: function(value) {
-                        return (value * 100).toFixed(0) + '%';
+                        return formatAxisPercent(Number(value));
                     }
                 }
             }
         }
     };
 
-    // Create or update probability chart
+    const datasets = [
+        {
+            label: 'Positive test result',
+            data: xValues.map((x, i) => ({ x, y: positiveProbabilities[i] })),
+            borderColor: 'rgb(37, 99, 235)',
+            backgroundColor: 'rgba(37, 99, 235, 0.10)',
+            borderWidth: 3,
+            fill: true,
+            tension: 0.4,
+            pointRadius: 0,
+            pointHoverRadius: 5
+        },
+        {
+            label: 'Negative test result',
+            data: xValues.map((x, i) => ({ x, y: negativeProbabilities[i] })),
+            borderColor: 'rgb(190, 18, 60)',
+            backgroundColor: 'rgba(190, 18, 60, 0.08)',
+            borderWidth: 3,
+            fill: true,
+            tension: 0.4,
+            pointRadius: 0,
+            pointHoverRadius: 5
+        }
+    ];
+
     if (!probabilityChart) {
         const ctx = document.getElementById('probability-chart').getContext('2d');
 
@@ -313,30 +371,7 @@ function updateCharts() {
             type: 'line',
             data: {
                 labels: xValues,
-                datasets: [
-                    {
-                        label: 'Positive Test Result',
-                        data: xValues.map((x, i) => ({x: x, y: positiveProbabilities[i]})),
-                        borderColor: 'rgb(102, 126, 234)',
-                        backgroundColor: 'rgba(102, 126, 234, 0.1)',
-                        borderWidth: 3,
-                        fill: true,
-                        tension: 0.4,
-                        pointRadius: 0,
-                        pointHoverRadius: 5
-                    },
-                    {
-                        label: 'Negative Test Result',
-                        data: xValues.map((x, i) => ({x: x, y: negativeProbabilities[i]})),
-                        borderColor: 'rgb(220, 38, 127)',
-                        backgroundColor: 'rgba(220, 38, 127, 0.1)',
-                        borderWidth: 3,
-                        fill: true,
-                        tension: 0.4,
-                        pointRadius: 0,
-                        pointHoverRadius: 5
-                    }
-                ]
+                datasets
             },
             options: {
                 ...commonOptions,
@@ -344,22 +379,12 @@ function updateCharts() {
                     ...commonOptions.plugins,
                     title: {
                         display: true,
-                        text: 'Post-Test Probability of Disease',
+                        text: `Post-test probability by ${xLabel.toLowerCase()}`,
                         font: {
                             size: 18,
                             weight: 'bold'
                         },
                         padding: 20
-                    }
-                },
-                scales: {
-                    ...commonOptions.scales,
-                    y: {
-                        ...commonOptions.scales.y,
-                        title: {
-                            ...commonOptions.scales.y.title,
-                            text: 'Probability of Disease'
-                        }
                     }
                 }
             }
@@ -368,181 +393,276 @@ function updateCharts() {
         setupCrosshairHandlers(probabilityChart, 'probability-chart');
     } else {
         probabilityChart.options.scales.x.type = isLogScale ? 'logarithmic' : 'linear';
-        probabilityChart.options.scales.x.min = isLogScale ? 0.005 : undefined;
-        probabilityChart.options.scales.x.max = isLogScale ? 1 : undefined;
+        probabilityChart.options.scales.x.min = isLogScale ? parameters.prevalence.min : 0.01;
+        probabilityChart.options.scales.x.max = isLogScale ? parameters.prevalence.max : 0.99;
         probabilityChart.options.scales.x.title.text = xLabel;
-        probabilityChart.options.scales.x.ticks.callback = function(value) {
-            if (isLogScale) {
-                return toSignificantFigures(value, 3);
-            }
-            return value.toFixed(2);
-        };
+        probabilityChart.options.plugins.title.text = `Post-test probability by ${xLabel.toLowerCase()}`;
         probabilityChart.data.labels = xValues;
-        probabilityChart.data.datasets[0].data = xValues.map((x, i) => ({x: x, y: positiveProbabilities[i]}));
-        probabilityChart.data.datasets[1].data = xValues.map((x, i) => ({x: x, y: negativeProbabilities[i]}));
+        probabilityChart.data.datasets[0].data = datasets[0].data;
+        probabilityChart.data.datasets[1].data = datasets[1].data;
         probabilityChart.update('none');
     }
 
-    updateInterpretation(positiveProbabilities, negativeProbabilities, xLabel);
+    updateInterpretation(positiveProbabilities, negativeProbabilities, xValues);
 }
 
-// Find inflection points and plateaus in a curve
-function analyzeInflectionAndPlateau(values, xValues) {
-    const n = values.length;
-
-    // Calculate first derivative (rate of change)
+function analyzeInflection(values, xValues) {
     const derivatives = [];
-    for (let i = 1; i < n - 1; i++) {
-        // Use central difference for better accuracy
+
+    for (let i = 1; i < values.length - 1; i++) {
         const dx = xValues[i + 1] - xValues[i - 1];
         const dy = values[i + 1] - values[i - 1];
-        derivatives.push({ index: i, derivative: dy / dx, x: xValues[i], y: values[i] });
+        derivatives.push({
+            x: xValues[i],
+            y: values[i],
+            derivative: dy / dx
+        });
     }
 
-    // Find max rate of change (steepest point / inflection region)
-    let maxDerivIdx = 0;
-    let maxDeriv = Math.abs(derivatives[0].derivative);
-    for (let i = 1; i < derivatives.length; i++) {
-        if (Math.abs(derivatives[i].derivative) > maxDeriv) {
-            maxDeriv = Math.abs(derivatives[i].derivative);
-            maxDerivIdx = i;
-        }
-    }
-    const inflectionPoint = derivatives[maxDerivIdx];
-
-    // Detect plateaus: regions where derivative is near zero relative to max
-    const threshold = maxDeriv * 0.1; // 10% of max slope
-    const lowPlateau = derivatives.slice(0, Math.floor(derivatives.length / 3))
-        .filter(d => Math.abs(d.derivative) < threshold);
-    const highPlateau = derivatives.slice(Math.floor(2 * derivatives.length / 3))
-        .filter(d => Math.abs(d.derivative) < threshold);
-
-    return {
-        inflectionPoint,
-        hasLowPlateau: lowPlateau.length > derivatives.length / 6,
-        hasHighPlateau: highPlateau.length > derivatives.length / 6,
-        lowPlateauValue: values[0],
-        highPlateauValue: values[n - 1]
-    };
+    return derivatives.reduce((best, point) => {
+        return Math.abs(point.derivative) > Math.abs(best.derivative) ? point : best;
+    }, derivatives[0]);
 }
 
-// Update interpretation text with meaningful insights
-function updateInterpretation(positiveProbabilities, negativeProbabilities, xLabel) {
+function updateInterpretation(positiveProbabilities, negativeProbabilities, xValues) {
     const xVar = xVariableSelect.value;
-    const { xValues } = generatePlotData();
-
-    const posAnalysis = analyzeInflectionAndPlateau(positiveProbabilities, xValues);
-    const negAnalysis = analyzeInflectionAndPlateau(negativeProbabilities, xValues);
-
-    let interpretation = '';
+    const scenario = currentScenario();
+    const posInflection = analyzeInflection(positiveProbabilities, xValues);
+    let interpretation = `At ${formatPercentValue(scenario.prevalence)} pre-test probability, a positive result raises the estimated probability of disease to ${formatPercentValue(scenario.positiveProbability)} and a negative result lowers it to ${formatPercentValue(scenario.negativeProbability)}. `;
 
     if (xVar === 'prevalence') {
-        // Describe positive test curve behavior
-        const posInflectionPrev = toSignificantFigures(posAnalysis.inflectionPoint.x, 2);
-        const posInflectionProb = (posAnalysis.inflectionPoint.y * 100).toFixed(0);
-
-        interpretation = `The positive test curve shows its steepest change around prevalence ${posInflectionPrev} (at ${posInflectionProb}% probability). `;
-
-        if (posAnalysis.hasLowPlateau && posAnalysis.hasHighPlateau) {
-            interpretation += `The curve plateaus at both extremes: near ${(posAnalysis.lowPlateauValue * 100).toFixed(0)}% at low prevalence and ${(posAnalysis.highPlateauValue * 100).toFixed(0)}% at high prevalence. `;
-        } else if (posAnalysis.hasHighPlateau) {
-            interpretation += `At high prevalence, the curve plateaus near ${(posAnalysis.highPlateauValue * 100).toFixed(0)}%. `;
-        } else if (posAnalysis.hasLowPlateau) {
-            interpretation += `At low prevalence, the curve plateaus near ${(posAnalysis.lowPlateauValue * 100).toFixed(0)}%. `;
-        }
-
-        // Note about negative test
-        interpretation += `A negative test keeps probability below ${(Math.max(...negativeProbabilities) * 100).toFixed(0)}% across all prevalence values.`;
-
+        interpretation += `With sensitivity ${formatPercentValue(scenario.sensitivity)} and specificity ${formatPercentValue(scenario.specificity)}, the positive-result curve changes fastest near ${formatPercentValue(posInflection.x, 2)} pre-test probability.`;
     } else if (xVar === 'sensitivity') {
-        const posInflectionSens = posAnalysis.inflectionPoint.x.toFixed(2);
-        const posInflectionProb = (posAnalysis.inflectionPoint.y * 100).toFixed(0);
-
-        interpretation = `Post-test probability changes most rapidly around sensitivity ${posInflectionSens}. `;
-
-        if (posAnalysis.hasHighPlateau) {
-            interpretation += `Above this point, increasing sensitivity yields diminishing returns as probability plateaus near ${(posAnalysis.highPlateauValue * 100).toFixed(0)}%. `;
-        }
-
-        interpretation += `Negative test probability drops from ${(negativeProbabilities[0] * 100).toFixed(0)}% to ${(negativeProbabilities[negativeProbabilities.length - 1] * 100).toFixed(0)}% as sensitivity increases.`;
-
+        interpretation += `Across the sensitivity range, the negative-result probability moves from ${formatPercentValue(negativeProbabilities[0])} to ${formatPercentValue(negativeProbabilities[negativeProbabilities.length - 1])}.`;
     } else if (xVar === 'specificity') {
-        const posInflectionSpec = posAnalysis.inflectionPoint.x.toFixed(2);
-        const posInflectionProb = (posAnalysis.inflectionPoint.y * 100).toFixed(0);
-
-        interpretation = `The positive test curve inflects near specificity ${posInflectionSpec} (${posInflectionProb}% probability). `;
-
-        if (posAnalysis.hasLowPlateau) {
-            interpretation += `At low specificity, false positives dominate and probability plateaus near ${(posAnalysis.lowPlateauValue * 100).toFixed(0)}%. `;
-        }
-        if (posAnalysis.hasHighPlateau) {
-            interpretation += `High specificity (>0.95) offers diminishing returns as the curve flattens near ${(posAnalysis.highPlateauValue * 100).toFixed(0)}%. `;
-        }
-
-        interpretation += `Negative test probability remains stable around ${(negativeProbabilities[Math.floor(negativeProbabilities.length / 2)] * 100).toFixed(0)}%.`;
+        interpretation += `Across the specificity range, the positive-result probability moves from ${formatPercentValue(positiveProbabilities[0])} to ${formatPercentValue(positiveProbabilities[positiveProbabilities.length - 1])}.`;
     }
 
     interpretationText.textContent = interpretation;
 }
 
-// Update control visibility based on selected x-variable
 function updateControlVisibility() {
     const xVar = xVariableSelect.value;
 
-    // Show all controls
-    prevalenceControl.classList.remove('hidden');
-    sensitivityControl.classList.remove('hidden');
-    specificityControl.classList.remove('hidden');
+    Object.values(parameters).forEach(parameter => {
+        parameter.control.classList.remove('hidden');
+    });
 
-    if (xVar === 'prevalence') {
-        prevalenceControl.classList.add('hidden');
-    } else if (xVar === 'sensitivity') {
-        sensitivityControl.classList.add('hidden');
-    } else if (xVar === 'specificity') {
-        specificityControl.classList.add('hidden');
-    }
+    parameters[xVar].control.classList.add('hidden');
 }
 
-// Update LR display values
 function updateLRDisplay() {
-    const sensitivity = parseFloat(sensitivitySlider.value);
-    const specificity = parseFloat(specificitySlider.value);
-    const { lrPos, lrNeg } = calculateLikelihoodRatios(sensitivity, specificity);
-
+    const { lrPos, lrNeg } = currentScenario();
     lrPosValue.textContent = lrPos.toFixed(2);
     lrNegValue.textContent = lrNeg.toFixed(2);
 }
 
-// Update value displays
-function updateValueDisplays() {
-    prevalenceValue.textContent = toSignificantFigures(parseFloat(prevalenceSlider.value), 3);
-    sensitivityValue.textContent = parseFloat(sensitivitySlider.value).toFixed(2);
-    specificityValue.textContent = parseFloat(specificitySlider.value).toFixed(2);
-    updateLRDisplay();
+function setParameterValue(name, value, formatInput = true) {
+    const parameter = parameters[name];
+    const nextValue = clamp(value, parameter.min, parameter.max);
+
+    parameter.slider.value = nextValue.toFixed(4);
+
+    if (formatInput) {
+        parameter.input.value = formatPercentInput(nextValue);
+    }
 }
 
-// Event listeners
+function updateAllInputDisplays() {
+    Object.keys(parameters).forEach(name => {
+        setParameterValue(name, parameterValue(name), true);
+    });
+}
+
+function buildPermalink() {
+    const url = new URL(window.location.href);
+    url.searchParams.set('x', xVariableSelect.value);
+
+    Object.keys(parameters).forEach(name => {
+        url.searchParams.set(name, formatPercentInput(parameterValue(name)));
+    });
+
+    return url.toString();
+}
+
+function updatePermalink() {
+    window.history.replaceState(null, '', buildPermalink());
+}
+
+function refreshCalculations(options = {}) {
+    const { formatInputs = true } = options;
+
+    if (formatInputs) updateAllInputDisplays();
+    updateLRDisplay();
+    updateCharts();
+    updatePermalink();
+}
+
+function loadPermalinkParameters() {
+    const query = new URLSearchParams(window.location.search);
+    const xVar = query.get('x');
+
+    if (xVar && parameters[xVar]) {
+        xVariableSelect.value = xVar;
+    }
+
+    Object.keys(parameters).forEach(name => {
+        const rawValue = query.get(name);
+        if (!rawValue) return;
+
+        const normalized = String(rawValue).replace('%', '').trim();
+        const numericValue = Number(normalized);
+        if (!Number.isFinite(numericValue)) return;
+
+        const value = Math.abs(numericValue) > 1 ? numericValue / 100 : numericValue;
+        setParameterValue(name, value, true);
+    });
+}
+
+function csvEscape(value) {
+    const text = String(value);
+    if (!/[",\n]/.test(text)) return text;
+    return `"${text.replace(/"/g, '""')}"`;
+}
+
+function downloadBlob(content, type, filename) {
+    const blob = new Blob([content], { type });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+
+    link.href = url;
+    link.download = filename;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    URL.revokeObjectURL(url);
+}
+
+function timestampForFilename() {
+    return new Date().toISOString().slice(0, 19).replace(/[:T]/g, '-');
+}
+
+function buildCalculationText() {
+    const scenario = currentScenario();
+
+    return [
+        'Post-Test Probability Explorer',
+        `Pre-test probability: ${formatPercentValue(scenario.prevalence, 2)}`,
+        `Sensitivity: ${formatPercentValue(scenario.sensitivity, 2)}`,
+        `Specificity: ${formatPercentValue(scenario.specificity, 2)}`,
+        `LR+: ${scenario.lrPos.toFixed(2)}`,
+        `LR-: ${scenario.lrNeg.toFixed(2)}`,
+        `Positive result post-test probability: ${formatPercentValue(scenario.positiveProbability, 2)}`,
+        `Negative result post-test probability: ${formatPercentValue(scenario.negativeProbability, 2)}`,
+        `Permalink: ${buildPermalink()}`
+    ].join('\n');
+}
+
+function buildCsv() {
+    const { xValues, positiveProbabilities, negativeProbabilities, xLabel } = generatePlotData();
+    const rows = [
+        [
+            'x_variable',
+            'x_percent',
+            'positive_result_post_test_probability_percent',
+            'negative_result_post_test_probability_percent'
+        ]
+    ];
+
+    xValues.forEach((x, index) => {
+        rows.push([
+            xLabel,
+            formatPercentInput(x),
+            formatPercentInput(positiveProbabilities[index]),
+            formatPercentInput(negativeProbabilities[index])
+        ]);
+    });
+
+    return rows.map(row => row.map(csvEscape).join(',')).join('\n');
+}
+
+async function copyText(text) {
+    if (navigator.clipboard && window.isSecureContext) {
+        try {
+            await navigator.clipboard.writeText(text);
+            return;
+        } catch (error) {
+            // Fall through to the textarea copy path for browsers that deny clipboard access.
+        }
+    }
+
+    const textArea = document.createElement('textarea');
+    textArea.value = text;
+    textArea.style.position = 'fixed';
+    textArea.style.left = '-999px';
+    document.body.appendChild(textArea);
+    textArea.focus();
+    textArea.select();
+    document.execCommand('copy');
+    textArea.remove();
+}
+
+function showStatus(message) {
+    exportStatus.textContent = message;
+    window.clearTimeout(statusTimeout);
+    statusTimeout = window.setTimeout(() => {
+        exportStatus.textContent = '';
+    }, 3500);
+}
+
+Object.keys(parameters).forEach(name => {
+    const parameter = parameters[name];
+
+    parameter.slider.addEventListener('input', () => {
+        setParameterValue(name, parseFloat(parameter.slider.value), true);
+        refreshCalculations({ formatInputs: false });
+    });
+
+    parameter.input.addEventListener('input', () => {
+        const parsedValue = parsePercentInput(parameter.input.value);
+        if (parsedValue === null) return;
+
+        setParameterValue(name, parsedValue, false);
+        refreshCalculations({ formatInputs: false });
+    });
+
+    parameter.input.addEventListener('blur', () => {
+        const parsedValue = parsePercentInput(parameter.input.value);
+        setParameterValue(name, parsedValue === null ? parameterValue(name) : parsedValue, true);
+        refreshCalculations({ formatInputs: false });
+    });
+});
+
 xVariableSelect.addEventListener('change', () => {
     updateControlVisibility();
-    updateCharts();
+    refreshCalculations();
 });
 
-prevalenceSlider.addEventListener('input', () => {
-    updateValueDisplays();
-    updateCharts();
+document.getElementById('copy-calculation').addEventListener('click', async () => {
+    await copyText(buildCalculationText());
+    showStatus('Calculation copied.');
 });
 
-sensitivitySlider.addEventListener('input', () => {
-    updateValueDisplays();
-    updateCharts();
+document.getElementById('export-png').addEventListener('click', () => {
+    const link = document.createElement('a');
+    link.href = probabilityChart.toBase64Image('image/png', 1);
+    link.download = `post-test-probability-${timestampForFilename()}.png`;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    showStatus('PNG exported.');
 });
 
-specificitySlider.addEventListener('input', () => {
-    updateValueDisplays();
-    updateCharts();
+document.getElementById('export-csv').addEventListener('click', () => {
+    downloadBlob(buildCsv(), 'text/csv;charset=utf-8', `post-test-probability-${timestampForFilename()}.csv`);
+    showStatus('CSV exported.');
 });
 
-// Initialize
+document.getElementById('copy-link').addEventListener('click', async () => {
+    await copyText(buildPermalink());
+    showStatus('Link copied.');
+});
+
+loadPermalinkParameters();
 updateControlVisibility();
-updateValueDisplays();
-updateCharts();
+refreshCalculations();

@@ -3,14 +3,14 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Disease Probability Visualizer</title>
+    <title>Post-Test Probability Explorer</title>
     <link rel="stylesheet" href="styles.css">
 </head>
 <body>
     <div class="container">
         <header>
-            <h1>Disease Probability Visualizer</h1>
-            <p class="subtitle">Visualize post-test probability based on diagnostic test parameters</p>
+            <h1>Post-Test Probability Explorer</h1>
+            <p class="subtitle">Explore how diagnostic test characteristics shift pre-test probability.</p>
         </header>
 
         <div class="main-content">
@@ -30,24 +30,36 @@
                     <h3>Fixed Parameters</h3>
 
                     <div id="prevalence-control" class="parameter-control">
-                        <label for="prevalence">
-                            Prevalence: <span id="prevalence-value">0.1</span>
-                        </label>
-                        <input type="range" id="prevalence" min="0.005" max="1" step="0.001" value="0.1" class="slider">
+                        <div class="parameter-heading">
+                            <label for="prevalence">Prevalence</label>
+                            <div class="percent-field">
+                                <input type="text" id="prevalence-input" value="10" inputmode="decimal" aria-label="Prevalence percent">
+                                <span aria-hidden="true">%</span>
+                            </div>
+                        </div>
+                        <input type="range" id="prevalence" min="0.005" max="1" step="0.0001" value="0.1" class="slider" aria-label="Prevalence">
                     </div>
 
                     <div id="sensitivity-control" class="parameter-control">
-                        <label for="sensitivity">
-                            Sensitivity: <span id="sensitivity-value">0.90</span>
-                        </label>
-                        <input type="range" id="sensitivity" min="0.01" max="0.99" step="0.01" value="0.90" class="slider">
+                        <div class="parameter-heading">
+                            <label for="sensitivity">Sensitivity</label>
+                            <div class="percent-field">
+                                <input type="text" id="sensitivity-input" value="90" inputmode="decimal" aria-label="Sensitivity percent">
+                                <span aria-hidden="true">%</span>
+                            </div>
+                        </div>
+                        <input type="range" id="sensitivity" min="0.01" max="0.99" step="0.0001" value="0.90" class="slider" aria-label="Sensitivity">
                     </div>
 
                     <div id="specificity-control" class="parameter-control">
-                        <label for="specificity">
-                            Specificity: <span id="specificity-value">0.90</span>
-                        </label>
-                        <input type="range" id="specificity" min="0.01" max="0.99" step="0.01" value="0.90" class="slider">
+                        <div class="parameter-heading">
+                            <label for="specificity">Specificity</label>
+                            <div class="percent-field">
+                                <input type="text" id="specificity-input" value="90" inputmode="decimal" aria-label="Specificity percent">
+                                <span aria-hidden="true">%</span>
+                            </div>
+                        </div>
+                        <input type="range" id="specificity" min="0.01" max="0.99" step="0.0001" value="0.90" class="slider" aria-label="Specificity">
                     </div>
 
                 </div>
@@ -70,6 +82,13 @@
             </aside>
 
             <main class="chart-container">
+                <div class="export-actions" aria-label="Export actions">
+                    <button type="button" id="copy-calculation" class="action-button">Copy calculation</button>
+                    <button type="button" id="export-png" class="action-button">Export PNG</button>
+                    <button type="button" id="export-csv" class="action-button">Export CSV</button>
+                    <button type="button" id="copy-link" class="action-button">Copy link</button>
+                    <p id="export-status" class="export-status" aria-live="polite"></p>
+                </div>
                 <div class="chart-wrapper">
                     <canvas id="probability-chart"></canvas>
                 </div>
@@ -77,6 +96,7 @@
                     <h4>Interpretation</h4>
                     <p id="interpretation-text"></p>
                 </div>
+                <p class="clinical-disclaimer">Educational use only. Apply with clinical context and validated test characteristics; this is not medical advice.</p>
             </main>
         </div>
     </div>

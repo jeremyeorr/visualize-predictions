@@ -1,6 +1,6 @@
-# Disease Probability Visualizer
+# Post-Test Probability Explorer
 
-A web application for visualizing post-test probability of disease based on diagnostic test parameters. Built with HTML, CSS, and JavaScript - runs entirely in the browser with no server required.
+A browser-based educational tool for exploring how diagnostic test characteristics shift pre-test probability into post-test probability. Built with HTML, CSS, and JavaScript - runs entirely in the browser with no server required.
 
 ## Features
 
@@ -12,9 +12,10 @@ A web application for visualizing post-test probability of disease based on diag
   - Likelihood Ratio - (negative)
 
 - Select which parameter to vary on the x-axis
-- Hold other parameters constant at user-defined values
+- Hold other parameters constant with sliders and precise percent inputs
 - Calculate probability for both positive and negative test results
-- Interactive sliders and inputs for easy parameter adjustment
+- Use percent labels throughout the interface
+- Copy a calculation summary, export the chart as PNG, export plotted data as CSV, or copy a permalink with encoded parameters
 - Responsive design works on desktop and mobile
 
 ## Running Locally
@@ -33,8 +34,8 @@ Simply open `index.html` in your web browser. No installation or server required
 
 1. **Select X-axis Variable**: Choose which parameter you want to visualize across its full range
 2. **Set Fixed Parameters**: Adjust the sliders/inputs for parameters you want to hold constant
-3. **Choose Test Result**: Select whether you want to see probability for a positive or negative test result
-4. **Interpret the Graph**: The y-axis shows the post-test probability of disease
+3. **Copy or Export**: Use the export actions to copy the current calculation, save the chart, save plotted data, or share a parameterized link
+4. **Interpret the Graph**: The y-axis shows the post-test probability of disease after positive and negative test results
 
 ## Understanding the Parameters
 
@@ -52,6 +53,8 @@ The app uses Bayes' theorem to calculate post-test probabilities:
 - When using likelihood ratios (which override sensitivity/specificity)
 
 Post-test probability helps clinicians understand how a test result changes the probability that a patient has a disease.
+
+This app is for education and exploration only. Apply results with clinical context and validated test characteristics; it is not medical advice.
 
 ## Technical Details
 
