@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Post-Test Probability Explorer</title>
-    <link rel="stylesheet" href="styles.css?v=pretest-probability">
+    <link rel="stylesheet" href="styles.css?v=natural-frequency">
 </head>
 <body>
     <div class="container">
@@ -34,11 +34,11 @@
                 <hr>
 
                 <div class="control-section">
-                    <h3>Fixed Parameters</h3>
+                    <h3 id="parameter-section-heading">Point Estimate Inputs</h3>
 
                     <div id="prevalence-control" class="parameter-control">
                         <div class="parameter-heading">
-                            <label for="prevalence">Pre-test probability / prior mean</label>
+                            <label for="prevalence" id="prevalence-label">Pre-test probability</label>
                             <div class="percent-field">
                                 <input type="text" id="prevalence-input" value="10" inputmode="decimal" aria-label="Pre-test probability percent">
                                 <span aria-hidden="true">%</span>
@@ -72,16 +72,20 @@
                 </div>
 
                 <div id="prior-strength-control" class="control-section hidden">
-                    <h3>Prior Certainty</h3>
+                    <h3>Prior Confidence</h3>
                     <div class="parameter-control">
                         <div class="parameter-heading">
-                            <label for="prior-strength">Prior sample size</label>
+                            <label for="prior-strength">Confidence</label>
                             <div class="number-field">
-                                <input type="text" id="prior-strength-input" value="20" inputmode="numeric" aria-label="Prior sample size equivalent patients input" aria-describedby="prior-strength-note">
+                                <input type="text" id="prior-strength-input" value="20" inputmode="numeric" aria-label="Prior confidence input" aria-describedby="prior-strength-note">
                             </div>
                         </div>
-                        <input type="range" id="prior-strength" min="2" max="500" step="1" value="20" class="slider" aria-label="Prior sample size equivalent patients slider" aria-describedby="prior-strength-note">
-                        <p id="prior-strength-note" class="field-note">Measured as equivalent patients: fewer makes the prior wider; more makes it narrower.</p>
+                        <input type="range" id="prior-strength" min="1" max="100" step="1" value="20" class="slider" aria-label="Prior confidence slider" aria-describedby="prior-strength-note">
+                        <div class="slider-scale" aria-hidden="true">
+                            <span>Low</span>
+                            <span>High</span>
+                        </div>
+                        <p id="prior-strength-note" class="field-note">Lower confidence means a wider prior; higher confidence means a narrower prior.</p>
                     </div>
                 </div>
 
@@ -115,76 +119,94 @@
                     <div class="chart-wrapper">
                         <canvas id="probability-chart"></canvas>
                     </div>
-                    <div class="interpretation">
-                        <h4>Interpretation</h4>
-                        <p id="interpretation-text"></p>
-                    </div>
+                    <section class="natural-frequency" aria-label="Natural frequencies per 1,000 similar patients">
+                        <div class="section-heading-row">
+                            <h4>Natural Frequencies</h4>
+                            <span>per 1,000 similar patients</span>
+                        </div>
+                        <p id="natural-frequency-context" class="natural-frequency-context"></p>
+                        <div class="natural-frequency-table-wrap">
+                            <table class="natural-frequency-table">
+                                <thead>
+                                    <tr>
+                                        <th scope="col">Measure</th>
+                                        <th scope="col">Value</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr>
+                                        <th scope="row">True positives</th>
+                                        <td id="true-positive-count">--</td>
+                                    </tr>
+                                    <tr>
+                                        <th scope="row">False positives</th>
+                                        <td id="false-positive-count">--</td>
+                                    </tr>
+                                    <tr>
+                                        <th scope="row">False negatives</th>
+                                        <td id="false-negative-count">--</td>
+                                    </tr>
+                                    <tr>
+                                        <th scope="row">True negatives</th>
+                                        <td id="true-negative-count">--</td>
+                                    </tr>
+                                    <tr>
+                                        <th scope="row">PPV</th>
+                                        <td id="ppv-value">--</td>
+                                    </tr>
+                                    <tr>
+                                        <th scope="row">NPV</th>
+                                        <td id="npv-value">--</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                        <p class="natural-frequency-note">Counts are rounded to the nearest patient; PPV and NPV use the unrounded counts.</p>
+                    </section>
                 </div>
 
                 <div id="bayesian-panel" class="tab-panel hidden" role="tabpanel" aria-labelledby="bayesian-tab">
-                    <div class="summary-grid" aria-label="Bayesian distribution summaries">
-                        <article class="summary-card">
-                            <h4>Prior</h4>
-                            <dl>
-                                <div>
-                                    <dt>Mean</dt>
-                                    <dd id="prior-mean-value">10%</dd>
-                                </div>
-                                <div>
-                                    <dt>Median</dt>
-                                    <dd id="prior-median-value">10%</dd>
-                                </div>
-                                <div>
-                                    <dt>95% interval</dt>
-                                    <dd id="prior-interval-value">--</dd>
-                                </div>
-                            </dl>
-                        </article>
-
-                        <article class="summary-card positive-card">
-                            <h4>Positive result</h4>
-                            <dl>
-                                <div>
-                                    <dt>Mean</dt>
-                                    <dd id="positive-mean-value">--</dd>
-                                </div>
-                                <div>
-                                    <dt>Median</dt>
-                                    <dd id="positive-median-value">--</dd>
-                                </div>
-                                <div>
-                                    <dt>95% interval</dt>
-                                    <dd id="positive-interval-value">--</dd>
-                                </div>
-                            </dl>
-                        </article>
-
-                        <article class="summary-card negative-card">
-                            <h4>Negative result</h4>
-                            <dl>
-                                <div>
-                                    <dt>Mean</dt>
-                                    <dd id="negative-mean-value">--</dd>
-                                </div>
-                                <div>
-                                    <dt>Median</dt>
-                                    <dd id="negative-median-value">--</dd>
-                                </div>
-                                <div>
-                                    <dt>95% interval</dt>
-                                    <dd id="negative-interval-value">--</dd>
-                                </div>
-                            </dl>
-                        </article>
-                    </div>
-
                     <div class="chart-wrapper">
                         <canvas id="bayesian-chart"></canvas>
                     </div>
-                    <div class="interpretation">
-                        <h4>Bayesian Interpretation</h4>
-                        <p id="bayesian-interpretation-text"></p>
-                    </div>
+                    <section class="bayesian-results" aria-label="Bayesian distribution results">
+                        <div class="section-heading-row">
+                            <h4>Bayesian Results</h4>
+                            <span>Disease probability</span>
+                        </div>
+                        <div class="results-table-wrap">
+                            <table class="results-table">
+                                <thead>
+                                    <tr>
+                                        <th scope="col">Distribution</th>
+                                        <th scope="col">Mean</th>
+                                        <th scope="col">Median</th>
+                                        <th scope="col">95% credible interval</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr>
+                                        <th scope="row">Prior</th>
+                                        <td id="prior-mean-value">10%</td>
+                                        <td id="prior-median-value">10%</td>
+                                        <td id="prior-interval-value">--</td>
+                                    </tr>
+                                    <tr class="positive-row">
+                                        <th scope="row">Positive result posterior</th>
+                                        <td id="positive-mean-value">--</td>
+                                        <td id="positive-median-value">--</td>
+                                        <td id="positive-interval-value">--</td>
+                                    </tr>
+                                    <tr class="negative-row">
+                                        <th scope="row">Negative result posterior</th>
+                                        <td id="negative-mean-value">--</td>
+                                        <td id="negative-median-value">--</td>
+                                        <td id="negative-interval-value">--</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </section>
                 </div>
 
                 <p class="clinical-disclaimer">Educational use only. Apply with clinical context and validated test characteristics; this is not medical advice.</p>
@@ -193,6 +215,6 @@
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
-    <script src="app.js?v=pretest-probability"></script>
+    <script src="app.js?v=natural-frequency"></script>
 </body>
 </html>

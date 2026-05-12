@@ -16,7 +16,7 @@ A browser-based educational tool for exploring how diagnostic test characteristi
 - Calculate probability for both positive and negative test results
 - Use percent labels throughout the interface
 - Switch to a Bayesian distributions tab that shows prior, positive-result posterior, and negative-result posterior disease-risk distributions
-- Control Bayesian prior certainty with an equivalent-patients input that narrows or widens the prior distribution
+- Control Bayesian prior confidence on a low-to-high scale that narrows or widens the prior distribution
 - Copy a calculation summary, export the chart as PNG, export plotted data as CSV, or copy a permalink with encoded parameters
 - Responsive design works on desktop and mobile
 

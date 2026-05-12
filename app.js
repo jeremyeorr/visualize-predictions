@@ -1,13 +1,22 @@
 const xVariableSelect = document.getElementById('x-variable');
 const xAxisSection = document.getElementById('x-axis-section');
-const interpretationText = document.getElementById('interpretation-text');
-const bayesianInterpretationText = document.getElementById('bayesian-interpretation-text');
 const lrPosValue = document.getElementById('lr-pos-value');
 const lrNegValue = document.getElementById('lr-neg-value');
 const exportStatus = document.getElementById('export-status');
+const parameterSectionHeading = document.getElementById('parameter-section-heading');
+const prevalenceLabel = document.getElementById('prevalence-label');
 const tabButtons = document.querySelectorAll('.tab-button');
 const pointPanel = document.getElementById('point-panel');
 const bayesianPanel = document.getElementById('bayesian-panel');
+const naturalFrequencyContext = document.getElementById('natural-frequency-context');
+const naturalFrequencyFields = {
+    truePositive: document.getElementById('true-positive-count'),
+    falsePositive: document.getElementById('false-positive-count'),
+    falseNegative: document.getElementById('false-negative-count'),
+    trueNegative: document.getElementById('true-negative-count'),
+    ppv: document.getElementById('ppv-value'),
+    npv: document.getElementById('npv-value')
+};
 
 const parameters = {
     prevalence: {
@@ -37,8 +46,8 @@ const parameters = {
 };
 
 const priorStrength = {
-    min: 2,
-    max: 500,
+    min: 1,
+    max: 100,
     defaultValue: 20,
     slider: document.getElementById('prior-strength'),
     input: document.getElementById('prior-strength-input'),
@@ -61,6 +70,11 @@ function trimTrailingZeros(value) {
 function formatPercentValue(probability, decimals = 1) {
     if (!Number.isFinite(probability)) return 'N/A';
     return `${trimTrailingZeros((probability * 100).toFixed(decimals))}%`;
+}
+
+function formatFrequencyCount(value) {
+    if (!Number.isFinite(value)) return 'N/A';
+    return `${Math.round(value).toLocaleString()} patients`;
 }
 
 function formatPercentInput(probability) {
@@ -99,10 +113,12 @@ function priorStrengthValue() {
     return parseInt(priorStrength.slider.value, 10);
 }
 
-function currentScenario() {
-    const prevalence = parameterValue('prevalence');
-    const sensitivity = parameterValue('sensitivity');
-    const specificity = parameterValue('specificity');
+function confidenceToPriorStrength(confidence) {
+    const normalized = clamp(confidence, priorStrength.min, priorStrength.max) / priorStrength.max;
+    return 2 + normalized * normalized * 498;
+}
+
+function buildScenario(prevalence, sensitivity, specificity) {
     const { lrPos, lrNeg } = calculateLikelihoodRatios(sensitivity, specificity);
     const positiveProbability = calculateProbability(prevalence, sensitivity, specificity, 'positive');
     const negativeProbability = calculateProbability(prevalence, sensitivity, specificity, 'negative');
@@ -118,6 +134,26 @@ function currentScenario() {
     };
 }
 
+function currentScenario() {
+    return buildScenario(
+        parameterValue('prevalence'),
+        parameterValue('sensitivity'),
+        parameterValue('specificity')
+    );
+}
+
+function scenarioForChartPoint(xValue) {
+    const values = {
+        prevalence: parameterValue('prevalence'),
+        sensitivity: parameterValue('sensitivity'),
+        specificity: parameterValue('specificity')
+    };
+    const xVar = xVariableSelect.value;
+
+    values[xVar] = clamp(xValue, 0, 1);
+    return buildScenario(values.prevalence, values.sensitivity, values.specificity);
+}
+
 function calculateLikelihoodRatios(sensitivity, specificity) {
     return {
         lrPos: sensitivity / (1 - specificity),
@@ -129,12 +165,56 @@ function calculateProbability(prevalence, sensitivity, specificity, testResult) 
     if (testResult === 'positive') {
         const numerator = sensitivity * prevalence;
         const denominator = numerator + (1 - specificity) * (1 - prevalence);
-        return numerator / denominator;
+        return denominator > 0 ? numerator / denominator : Number.NaN;
     }
 
     const numerator = (1 - sensitivity) * prevalence;
     const denominator = numerator + specificity * (1 - prevalence);
-    return numerator / denominator;
+    return denominator > 0 ? numerator / denominator : Number.NaN;
+}
+
+function safeRatio(numerator, denominator) {
+    return denominator > 0 ? numerator / denominator : Number.NaN;
+}
+
+function calculateNaturalFrequencies(scenario = currentScenario()) {
+    const cohortSize = 1000;
+    const diseased = scenario.prevalence * cohortSize;
+    const nonDiseased = cohortSize - diseased;
+    const truePositive = diseased * scenario.sensitivity;
+    const falseNegative = diseased * (1 - scenario.sensitivity);
+    const trueNegative = nonDiseased * scenario.specificity;
+    const falsePositive = nonDiseased * (1 - scenario.specificity);
+    const ppv = safeRatio(truePositive, truePositive + falsePositive);
+    const npv = safeRatio(trueNegative, trueNegative + falseNegative);
+
+    return {
+        cohortSize,
+        diseased,
+        nonDiseased,
+        truePositive,
+        falsePositive,
+        falseNegative,
+        trueNegative,
+        ppv,
+        npv
+    };
+}
+
+function describeNaturalFrequencyScenario(scenario, label) {
+    return `${label}: pre-test probability ${formatPercentValue(scenario.prevalence, 2)}, sensitivity ${formatPercentValue(scenario.sensitivity, 2)}, specificity ${formatPercentValue(scenario.specificity, 2)}.`;
+}
+
+function updateNaturalFrequencyTable(scenario = currentScenario(), label = 'Selected point') {
+    const frequencies = calculateNaturalFrequencies(scenario);
+
+    naturalFrequencyContext.textContent = describeNaturalFrequencyScenario(scenario, label);
+    naturalFrequencyFields.truePositive.textContent = formatFrequencyCount(frequencies.truePositive);
+    naturalFrequencyFields.falsePositive.textContent = formatFrequencyCount(frequencies.falsePositive);
+    naturalFrequencyFields.falseNegative.textContent = formatFrequencyCount(frequencies.falseNegative);
+    naturalFrequencyFields.trueNegative.textContent = formatFrequencyCount(frequencies.trueNegative);
+    naturalFrequencyFields.ppv.textContent = formatPercentValue(frequencies.ppv);
+    naturalFrequencyFields.npv.textContent = formatPercentValue(frequencies.npv);
 }
 
 function generatePlotData() {
@@ -142,16 +222,7 @@ function generatePlotData() {
     const { prevalence, sensitivity, specificity } = currentScenario();
     let xValues = [];
 
-    if (xVar === 'prevalence') {
-        const logMin = Math.log10(parameters.prevalence.min);
-        const logMax = Math.log10(parameters.prevalence.max);
-        xValues = Array.from({ length: 100 }, (_, i) => {
-            const logValue = logMin + (i * (logMax - logMin) / 99);
-            return Math.pow(10, logValue);
-        });
-    } else {
-        xValues = Array.from({ length: 100 }, (_, i) => 0.01 + (i * 0.98 / 99));
-    }
+    xValues = Array.from({ length: 101 }, (_, i) => i / 100);
 
     const positiveProbabilities = [];
     const negativeProbabilities = [];
@@ -227,20 +298,6 @@ function normalizeWeights(weights) {
     return weights.map(weight => weight / total);
 }
 
-function smoothValues(values, passes = 2) {
-    let smoothed = [...values];
-
-    for (let pass = 0; pass < passes; pass++) {
-        smoothed = smoothed.map((value, index, source) => {
-            const previous = source[Math.max(0, index - 1)];
-            const next = source[Math.min(source.length - 1, index + 1)];
-            return (previous + 2 * value + next) / 4;
-        });
-    }
-
-    return smoothed;
-}
-
 function normalizeDensity(values) {
     const maxValue = Math.max(...values);
     if (!Number.isFinite(maxValue) || maxValue <= 0) return values.map(() => 0);
@@ -248,15 +305,48 @@ function normalizeDensity(values) {
     return values.map(value => value / maxValue);
 }
 
-function binWeightedDistribution(values, weights, binCount) {
+function gaussianSmooth(values, sigma) {
+    const radius = Math.max(2, Math.ceil(sigma * 4));
+    const kernel = [];
+    let kernelTotal = 0;
+
+    for (let offset = -radius; offset <= radius; offset++) {
+        const weight = Math.exp(-(offset * offset) / (2 * sigma * sigma));
+        kernel.push(weight);
+        kernelTotal += weight;
+    }
+
+    return values.map((value, index) => {
+        let smoothedValue = 0;
+        let smoothedWeight = 0;
+
+        kernel.forEach((weight, kernelIndex) => {
+            const sourceIndex = index + kernelIndex - radius;
+            if (sourceIndex < 0 || sourceIndex >= values.length) return;
+
+            smoothedValue += values[sourceIndex] * weight;
+            smoothedWeight += weight;
+        });
+
+        return smoothedWeight > 0 ? smoothedValue / smoothedWeight : value;
+    });
+}
+
+function binWeightedDistribution(values, weights, binCount, smoothingSigma = 5) {
     const bins = Array.from({ length: binCount }, () => 0);
 
     values.forEach((value, index) => {
-        const binIndex = Math.round(clamp(value, 0, 1) * (binCount - 1));
-        bins[binIndex] += weights[index];
+        const scaledIndex = clamp(value, 0, 1) * (binCount - 1);
+        const lowerIndex = Math.floor(scaledIndex);
+        const upperIndex = Math.min(binCount - 1, lowerIndex + 1);
+        const upperWeight = scaledIndex - lowerIndex;
+        const lowerWeight = 1 - upperWeight;
+
+        bins[lowerIndex] += weights[index] * lowerWeight;
+        bins[upperIndex] += weights[index] * upperWeight;
     });
 
-    return normalizeDensity(smoothValues(bins));
+    return normalizeDensity(gaussianSmooth(bins, smoothingSigma));
 }
 
 function weightedQuantile(values, weights, quantile) {
@@ -288,12 +378,13 @@ function summarizeWeightedDistribution(values, weights) {
 
 function generateBayesianData() {
     const scenario = currentScenario();
-    const strength = priorStrengthValue();
+    const confidence = priorStrengthValue();
+    const strength = confidenceToPriorStrength(confidence);
     const priorMean = clamp(scenario.prevalence, 1e-6, 1 - 1e-6);
     const alpha = clamp(priorMean * strength, 1e-6, Number.POSITIVE_INFINITY);
     const beta = clamp((1 - priorMean) * strength, 1e-6, Number.POSITIVE_INFINITY);
-    const sampleCount = 1200;
-    const binCount = 201;
+    const sampleCount = 6000;
+    const binCount = 401;
     const priorValues = Array.from({ length: sampleCount }, (_, index) => (index + 0.5) / sampleCount);
     const priorWeights = normalizeWeights(priorValues.map(value => betaPdf(value, alpha, beta)));
     const positiveValues = priorValues.map(value => calculateProbability(value, scenario.sensitivity, scenario.specificity, 'positive'));
@@ -302,13 +393,14 @@ function generateBayesianData() {
 
     return {
         scenario,
+        confidence,
         strength,
         alpha,
         beta,
         probabilityValues,
-        priorDensity: binWeightedDistribution(priorValues, priorWeights, binCount),
-        positiveDensity: binWeightedDistribution(positiveValues, priorWeights, binCount),
-        negativeDensity: binWeightedDistribution(negativeValues, priorWeights, binCount),
+        priorDensity: binWeightedDistribution(priorValues, priorWeights, binCount, 3),
+        positiveDensity: binWeightedDistribution(positiveValues, priorWeights, binCount, 6),
+        negativeDensity: binWeightedDistribution(negativeValues, priorWeights, binCount, 6),
         summaries: {
             prior: summarizeWeightedDistribution(priorValues, priorWeights),
             positive: summarizeWeightedDistribution(positiveValues, priorWeights),
@@ -364,9 +456,10 @@ function createTooltipElement(chartId) {
     return tooltip;
 }
 
-function setupCrosshairHandlers(chart, chartId, mode = 'probability') {
+function setupCrosshairHandlers(chart, chartId, mode = 'probability', options = {}) {
     const canvas = chart.canvas;
     const tooltip = createTooltipElement(chartId);
+    const { onHoverPoint, onLeave } = options;
 
     canvas.addEventListener('mousemove', function(e) {
         const rect = canvas.getBoundingClientRect();
@@ -378,6 +471,7 @@ function setupCrosshairHandlers(chart, chartId, mode = 'probability') {
             chart.crosshair = null;
             chart.update('none');
             tooltip.style.display = 'none';
+            if (typeof onLeave === 'function') onLeave();
             return;
         }
 
@@ -396,6 +490,13 @@ function setupCrosshairHandlers(chart, chartId, mode = 'probability') {
                 closestDistance = distance;
                 closestIndex = i;
             }
+        }
+
+        const closestPoint = data[closestIndex];
+        const hoverScenario = mode === 'probability' ? scenarioForChartPoint(closestPoint.x) : null;
+
+        if (hoverScenario && typeof onHoverPoint === 'function') {
+            onHoverPoint(hoverScenario);
         }
 
         let tooltipContent = `<div class="tooltip-x">${chart.options.scales.x.title.text}: ${formatPercentValue(data[closestIndex].x, 2)}</div>`;
@@ -417,6 +518,16 @@ function setupCrosshairHandlers(chart, chartId, mode = 'probability') {
         });
 
         tooltipContent += '</div>';
+
+        if (hoverScenario) {
+            const frequencies = calculateNaturalFrequencies(hoverScenario);
+            tooltipContent += '<div class="tooltip-frequency">';
+            tooltipContent += `<span>Per 1,000: TP ${Math.round(frequencies.truePositive).toLocaleString()}, FP ${Math.round(frequencies.falsePositive).toLocaleString()}</span>`;
+            tooltipContent += `<span>FN ${Math.round(frequencies.falseNegative).toLocaleString()}, TN ${Math.round(frequencies.trueNegative).toLocaleString()}</span>`;
+            tooltipContent += `<span>PPV ${formatPercentValue(frequencies.ppv)}, NPV ${formatPercentValue(frequencies.npv)}</span>`;
+            tooltipContent += '</div>';
+        }
+
         tooltip.innerHTML = tooltipContent;
         tooltip.style.display = 'block';
         tooltip.style.left = `${x}px`;
@@ -428,10 +539,11 @@ function setupCrosshairHandlers(chart, chartId, mode = 'probability') {
         chart.crosshair = null;
         chart.update('none');
         tooltip.style.display = 'none';
+        if (typeof onLeave === 'function') onLeave();
     });
 }
 
-function pointChartOptions(xLabel, isLogScale) {
+function pointChartOptions(xLabel) {
     return {
         responsive: true,
         maintainAspectRatio: true,
@@ -474,9 +586,9 @@ function pointChartOptions(xLabel, isLogScale) {
         },
         scales: {
             x: {
-                type: isLogScale ? 'logarithmic' : 'linear',
-                min: isLogScale ? parameters.prevalence.min : 0.01,
-                max: isLogScale ? parameters.prevalence.max : 0.99,
+                type: 'linear',
+                min: 0,
+                max: 1,
                 title: {
                     display: true,
                     text: xLabel,
@@ -514,8 +626,6 @@ function pointChartOptions(xLabel, isLogScale) {
 
 function updatePointChart() {
     const { xValues, positiveProbabilities, negativeProbabilities, xLabel } = generatePlotData();
-    const xVar = xVariableSelect.value;
-    const isLogScale = xVar === 'prevalence';
     const datasets = [
         {
             label: 'Positive test result',
@@ -550,14 +660,17 @@ function updatePointChart() {
                 labels: xValues,
                 datasets
             },
-            options: pointChartOptions(xLabel, isLogScale)
+            options: pointChartOptions(xLabel)
         });
 
-        setupCrosshairHandlers(probabilityChart, 'probability-chart');
+        setupCrosshairHandlers(probabilityChart, 'probability-chart', 'probability', {
+            onHoverPoint: scenario => updateNaturalFrequencyTable(scenario, 'Hovered point'),
+            onLeave: () => updateNaturalFrequencyTable()
+        });
     } else {
-        probabilityChart.options.scales.x.type = isLogScale ? 'logarithmic' : 'linear';
-        probabilityChart.options.scales.x.min = isLogScale ? parameters.prevalence.min : 0.01;
-        probabilityChart.options.scales.x.max = isLogScale ? parameters.prevalence.max : 0.99;
+        probabilityChart.options.scales.x.type = 'linear';
+        probabilityChart.options.scales.x.min = 0;
+        probabilityChart.options.scales.x.max = 1;
         probabilityChart.options.scales.x.title.text = xLabel;
         probabilityChart.options.plugins.title.text = `Post-test probability by ${xLabel.toLowerCase()}`;
         probabilityChart.data.labels = xValues;
@@ -566,7 +679,7 @@ function updatePointChart() {
         probabilityChart.update('none');
     }
 
-    updatePointInterpretation(positiveProbabilities, negativeProbabilities, xValues);
+    updateNaturalFrequencyTable();
 }
 
 function bayesianChartOptions() {
@@ -712,41 +825,6 @@ function updateBayesianChart() {
     updateBayesianSummary(data);
 }
 
-function analyzeInflection(values, xValues) {
-    const derivatives = [];
-
-    for (let i = 1; i < values.length - 1; i++) {
-        const dx = xValues[i + 1] - xValues[i - 1];
-        const dy = values[i + 1] - values[i - 1];
-        derivatives.push({
-            x: xValues[i],
-            y: values[i],
-            derivative: dy / dx
-        });
-    }
-
-    return derivatives.reduce((best, point) => {
-        return Math.abs(point.derivative) > Math.abs(best.derivative) ? point : best;
-    }, derivatives[0]);
-}
-
-function updatePointInterpretation(positiveProbabilities, negativeProbabilities, xValues) {
-    const xVar = xVariableSelect.value;
-    const scenario = currentScenario();
-    const posInflection = analyzeInflection(positiveProbabilities, xValues);
-    let interpretation = `At ${formatPercentValue(scenario.prevalence)} pre-test probability, a positive result raises the estimated probability of disease to ${formatPercentValue(scenario.positiveProbability)} and a negative result lowers it to ${formatPercentValue(scenario.negativeProbability)}. `;
-
-    if (xVar === 'prevalence') {
-        interpretation += `With sensitivity ${formatPercentValue(scenario.sensitivity)} and specificity ${formatPercentValue(scenario.specificity)}, the positive-result curve changes fastest near ${formatPercentValue(posInflection.x, 2)} pre-test probability.`;
-    } else if (xVar === 'sensitivity') {
-        interpretation += `Across the sensitivity range, the negative-result probability moves from ${formatPercentValue(negativeProbabilities[0])} to ${formatPercentValue(negativeProbabilities[negativeProbabilities.length - 1])}.`;
-    } else if (xVar === 'specificity') {
-        interpretation += `Across the specificity range, the positive-result probability moves from ${formatPercentValue(positiveProbabilities[0])} to ${formatPercentValue(positiveProbabilities[positiveProbabilities.length - 1])}.`;
-    }
-
-    interpretationText.textContent = interpretation;
-}
-
 function formatInterval(summary) {
     return `${formatPercentValue(summary.lower)} to ${formatPercentValue(summary.upper)}`;
 }
@@ -758,17 +836,17 @@ function updateSummaryCard(prefix, summary) {
 }
 
 function updateBayesianSummary(data) {
-    const { summaries, scenario, strength } = data;
+    const { summaries } = data;
 
     updateSummaryCard('prior', summaries.prior);
     updateSummaryCard('positive', summaries.positive);
     updateSummaryCard('negative', summaries.negative);
-
-    bayesianInterpretationText.textContent = `With a prior mean of ${formatPercentValue(scenario.prevalence)} and prior certainty equal to ${strength} equivalent patients, the prior 95% interval is ${formatInterval(summaries.prior)}. A positive result shifts the posterior median to ${formatPercentValue(summaries.positive.median)} (${formatInterval(summaries.positive)}), while a negative result shifts it to ${formatPercentValue(summaries.negative.median)} (${formatInterval(summaries.negative)}).`;
 }
 
 function updateControlVisibility() {
     if (activeTab === 'bayesian') {
+        parameterSectionHeading.textContent = 'Prior and Test Inputs';
+        prevalenceLabel.textContent = 'Pre-test probability / prior mean';
         xAxisSection.classList.add('hidden');
         priorStrength.control.classList.remove('hidden');
         Object.values(parameters).forEach(parameter => {
@@ -777,6 +855,8 @@ function updateControlVisibility() {
         return;
     }
 
+    parameterSectionHeading.textContent = 'Point Estimate Inputs';
+    prevalenceLabel.textContent = 'Pre-test probability';
     xAxisSection.classList.remove('hidden');
     priorStrength.control.classList.add('hidden');
     Object.values(parameters).forEach(parameter => {
@@ -929,6 +1009,7 @@ function timestampForFilename() {
 
 function buildPointCalculationText() {
     const scenario = currentScenario();
+    const frequencies = calculateNaturalFrequencies(scenario);
 
     return [
         'Post-Test Probability Explorer - Point Estimate',
@@ -939,18 +1020,27 @@ function buildPointCalculationText() {
         `LR-: ${scenario.lrNeg.toFixed(2)}`,
         `Positive result post-test probability: ${formatPercentValue(scenario.positiveProbability, 2)}`,
         `Negative result post-test probability: ${formatPercentValue(scenario.negativeProbability, 2)}`,
+        '',
+        'Natural frequencies per 1,000 similar patients:',
+        `True positives: ${formatFrequencyCount(frequencies.truePositive)}`,
+        `False positives: ${formatFrequencyCount(frequencies.falsePositive)}`,
+        `False negatives: ${formatFrequencyCount(frequencies.falseNegative)}`,
+        `True negatives: ${formatFrequencyCount(frequencies.trueNegative)}`,
+        `PPV: ${formatPercentValue(frequencies.ppv)}`,
+        `NPV: ${formatPercentValue(frequencies.npv)}`,
+        '',
         `Permalink: ${buildPermalink()}`
     ].join('\n');
 }
 
 function buildBayesianCalculationText() {
     const data = generateBayesianData();
-    const { scenario, summaries, strength } = data;
+    const { scenario, summaries, confidence } = data;
 
     return [
         'Post-Test Probability Explorer - Bayesian Distributions',
         `Prior mean: ${formatPercentValue(scenario.prevalence, 2)}`,
-        `Prior certainty: ${strength} equivalent patients`,
+        `Prior confidence: ${confidence}/100`,
         `Sensitivity: ${formatPercentValue(scenario.sensitivity, 2)}`,
         `Specificity: ${formatPercentValue(scenario.specificity, 2)}`,
         `LR+: ${scenario.lrPos.toFixed(2)}`,

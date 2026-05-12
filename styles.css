@@ -196,6 +196,16 @@ header h1 {
     line-height: 1.4;
 }
 
+.slider-scale {
+    display: flex;
+    justify-content: space-between;
+    margin-top: 6px;
+    color: var(--muted);
+    font-size: 0.78rem;
+    font-weight: 700;
+    text-transform: uppercase;
+}
+
 .slider {
     width: 100%;
     height: 6px;
@@ -375,81 +385,116 @@ hr {
     max-height: 420px;
 }
 
-.summary-grid {
-    display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-    gap: 14px;
+.natural-frequency,
+.bayesian-results {
     margin-bottom: 24px;
-}
-
-.summary-card {
-    padding: 16px;
+    padding: 18px 20px;
     border: 1px solid var(--line);
-    border-left: 4px solid var(--accent);
     border-radius: 8px;
     background: white;
 }
 
-.summary-card h4 {
-    margin-bottom: 12px;
-    color: var(--ink);
-    font-size: 1rem;
-}
-
-.summary-card dl {
-    display: grid;
-    gap: 10px;
-}
-
-.summary-card dl div {
+.section-heading-row {
     display: flex;
+    align-items: baseline;
     justify-content: space-between;
-    gap: 12px;
-    border-bottom: 1px solid #edf1f4;
-    padding-bottom: 8px;
+    gap: 14px;
+    margin-bottom: 8px;
 }
 
-.summary-card dl div:last-child {
-    border-bottom: 0;
-    padding-bottom: 0;
+.section-heading-row h4 {
+    color: var(--ink);
+    font-size: 1.12rem;
 }
 
-.summary-card dt {
+.section-heading-row span {
     color: var(--muted);
-    font-size: 0.88rem;
+    font-size: 0.86rem;
+    font-weight: 700;
+    text-transform: uppercase;
 }
 
-.summary-card dd {
+.natural-frequency-context {
+    margin-bottom: 12px;
+    color: #435160;
+    font-size: 0.94rem;
+    line-height: 1.45;
+}
+
+.natural-frequency-table-wrap,
+.results-table-wrap {
+    overflow-x: auto;
+}
+
+.natural-frequency-table,
+.results-table {
+    width: 100%;
+    border-collapse: collapse;
+    table-layout: fixed;
+}
+
+.results-table {
+    min-width: 640px;
+}
+
+.natural-frequency-table th,
+.natural-frequency-table td,
+.results-table th,
+.results-table td {
+    padding: 10px 12px;
+    border-bottom: 1px solid #edf1f4;
+    text-align: left;
+}
+
+.natural-frequency-table thead th,
+.results-table thead th {
+    color: var(--muted);
+    font-size: 0.78rem;
+    font-weight: 800;
+    text-transform: uppercase;
+}
+
+.natural-frequency-table tbody th,
+.results-table tbody th {
+    color: #394453;
+    font-weight: 650;
+}
+
+.natural-frequency-table td,
+.results-table td {
     color: var(--ink);
     font-weight: 750;
     text-align: right;
 }
 
-.positive-card {
+.natural-frequency-table tr:last-child th,
+.natural-frequency-table tr:last-child td,
+.results-table tr:last-child th,
+.results-table tr:last-child td {
+    border-bottom: 0;
+}
+
+.natural-frequency-note {
+    margin-top: 10px;
+    color: var(--muted);
+    font-size: 0.84rem;
+    line-height: 1.4;
+}
+
+.results-table tbody tr {
+    border-left: 4px solid transparent;
+}
+
+.results-table tbody tr:first-child {
+    border-left-color: var(--accent);
+}
+
+.results-table .positive-row {
     border-left-color: var(--blue);
 }
 
-.negative-card {
+.results-table .negative-row {
     border-left-color: var(--rose);
-}
-
-.interpretation {
-    background: var(--panel);
-    padding: 22px 24px;
-    border-left: 4px solid var(--accent);
-    border-radius: 8px;
-}
-
-.interpretation h4 {
-    font-size: 1.25rem;
-    margin-bottom: 11px;
-    color: var(--ink);
-}
-
-.interpretation p {
-    font-size: 1.02rem;
-    color: #435160;
-    line-height: 1.6;
 }
 
 .clinical-disclaimer {
@@ -472,7 +517,9 @@ hr {
     font-size: 12px;
     pointer-events: none;
     z-index: 100;
-    white-space: nowrap;
+    min-width: 210px;
+    max-width: 280px;
+    white-space: normal;
     transform: translateX(-50%);
 }
 
@@ -487,8 +534,19 @@ hr {
     gap: 2px;
 }
 
-.crosshair-tooltip .tooltip-y span {
+.crosshair-tooltip .tooltip-y span,
+.crosshair-tooltip .tooltip-frequency span {
     display: block;
+}
+
+.crosshair-tooltip .tooltip-frequency {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    margin-top: 6px;
+    padding-top: 6px;
+    border-top: 1px solid rgba(255, 255, 255, 0.22);
+    color: #dbeafe;
 }
 
 .tooltip-positive {
@@ -512,10 +570,6 @@ hr {
 
     .export-actions {
         grid-template-columns: repeat(2, minmax(0, 1fr));
-    }
-
-    .summary-grid {
-        grid-template-columns: 1fr;
     }
 
     header h1 {
@@ -566,5 +620,16 @@ hr {
 
     .export-actions {
         grid-template-columns: 1fr;
+    }
+
+    .section-heading-row {
+        align-items: flex-start;
+        flex-direction: column;
+        gap: 4px;
+    }
+
+    .natural-frequency,
+    .bayesian-results {
+        padding: 16px;
     }
 }
